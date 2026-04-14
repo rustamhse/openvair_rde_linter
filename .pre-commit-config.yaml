@@ -11,3 +11,10 @@ repos:
       entry: bash .githooks/ruff
       language: system
       types: [python]
+    - id: rde-ddd-linter
+      name: RDE DDD Linter
+      entry: python openvair/requirements_linter/precommit_script.py
+      language: python
+      files: ^(docs/reference/modules/|openvair/modules/)
+      pass_filenames: false
+      additional_dependencies: ['pyyaml', 'pydantic']
