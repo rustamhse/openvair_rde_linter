@@ -1,0 +1,69 @@
+# Спецификация: [Название фичи]
+
+[Бизнес-описание фичи]
+
+## Архитектурный контракт (DDD Specification)
+> **Инструкция для составителя документации:** Заполните необходимые секции. Удалите секции слоев, которые не модифицируются в рамках данной задачи.
+
+```yaml rde-spec
+feature: [техническое_имя_модуля, например: scheduler]
+description: "[Краткое описание задачи]"
+
+# ==========================================
+# 1. ДОМЕННЫЙ СЛОЙ (Domain Layer)
+# Сердце системы, бизнес-логика.
+# ==========================================
+domain_layer:
+  models:
+    - name: [ИмяКласса, например: CronJob]
+      description: "Доменная сущность. Опишите ключевые инварианты."
+  managers:
+    - name: [ИмяКласса, например: SchedulerManager]
+      description: "Управляет жизненным циклом моделей."
+
+# ==========================================
+# 2. СЕРВИСНЫЙ СЛОЙ (Service Layer)
+# Сценарии использования (Use Cases) и RPC-обработчики.
+# ==========================================
+service_layer:
+  managers:
+    - name: [ИмяКласса, например: SchedulerServiceLayerManager]
+      description: "Слушатель RPC очередей."
+  services:
+    - name: [имя_функции_или_класса, например: create_job]
+      description: "Сценарий создания сущности через Unit of Work."
+
+# ==========================================
+# 3. СЛОЙ АДАПТЕРОВ (Adapters Layer)
+# Инфраструктура, Базы Данных, Внешнее ПО.
+# ==========================================
+adapters_layer:
+  orm_models:
+    - name: [ИмяКласса, например: SchedulerJobs]
+      description: "SQLAlchemy модель (таблица БД)."
+  repositories:
+    - abstract: [ИмяКласса, например: AbstractSchedulerRepository]
+      concrete: [ИмяКласса, например: SqlAlchemySchedulerRepository]
+  serializers:
+    - name: [ИмяКласса, например: SchedulerSerializer]
+      description: "Конвертер между ORM и Domain."
+  external:
+    - name: [ИмяКласса, например: LibvirtDriver]
+      description: "Общение с гипервизором или ОС (опционально)."
+
+# ==========================================
+# 4. СЛОЙ ТОЧЕК ВХОДА (Entrypoints Layer)
+# REST API и DTO.
+# ==========================================
+entrypoints_layer:
+  schemas:
+    - name: [ИмяКласса, например: RequestCreateJob]
+      type: [request или response]
+  crud_adapters:
+    - name: [ИмяКласса, например: SchedulerCrud]
+      methods: [create_job, get_job]
+  endpoints:
+    - path: /[путь, например: /scheduler/jobs]
+      method: [POST, GET, PUT, DELETE]
+      statuses: [200, 201, 400, 404, 500]
+```
