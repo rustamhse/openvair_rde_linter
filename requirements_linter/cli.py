@@ -169,11 +169,13 @@ def main() -> None:
     logger.info('==================================================')
 
     if not report:
-        logger.info('Success! No architectural boundary violations found.')
+        logger.info(
+            '✅ Perfect match! No architectural boundary violations found.'
+        )
         sys.exit(0)
     else:
         for error in report:
-            logger.error(f'{error}')
+            logger.error(f'❌ {error}')
         logger.info('--------------------------------------------------')
         logger.error('STATUS: Contract violations detected.')
         logger.info('==================================================')

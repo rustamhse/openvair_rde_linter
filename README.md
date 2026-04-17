@@ -1,221 +1,97 @@
-# Open vAIR
+# Протокол воспроизведения эксперимента: Сравнение RDE-линтера и LLM
 
-## 🌍 Translations
+Данный протокол описывает шаги, необходимые для воспроизведения эксперимента по выявлению 43 искусственно внедренных архитектурных дефектов (Requirements Mutation) в проекте Open vAIR.
 
-- [Русский](README.ru.md)
-
-## 📖 Project Description
-
-**Open vAIR** is a lightweight solution based on the **vAIR** project,
-designed for use as a development environment and virtualization system. The
-program operates in interactive mode, providing a flexible and convenient
-tool for managing virtual infrastructure.
-
-![](.assets/dashboard.gif)
-![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
-![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
-![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
-![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
-![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
-![RabbitMQ](https://img.shields.io/badge/Rabbitmq-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)
-![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+## Подготовительный этап
+Все команды должны выполняться из корневой директории проекта `openvair`. Убедитесь, что мутированные спецификации (файлы `error_specification.md` с 43 внедренными ошибками) размещены в соответствующих директориях:
+* `docs\reference\modules\template\error_specification.md`
+* `docs\reference\modules\storage\error_specification.md`
+* `docs\reference\modules\backup\error_specification.md`
+* `docs\reference\modules\event_store\error_specification.md`
+* `docs\reference\modules\image\error_specification.md`
+* `docs\reference\modules\network\error_specification.md`
+* `docs\reference\modules\user\error_specification.md`
+* `docs\reference\modules\virtual_machines\error_specification.md`
+* `docs\reference\modules\volume\error_specification.md`
 
 ---
 
-<h3 align="left">Technologies:</h3>
-<p align="left"> <a href="https://www.docker.com/" target="_blank" rel="noreferrer"> <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original-wordmark.svg" alt="docker" width="40" height="40"/> </a> <a href="https://www.linux.org/" target="_blank" rel="noreferrer"> <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/linux/linux-original.svg" alt="linux" width="40" height="40"/> </a> <a href="https://www.postgresql.org" target="_blank" rel="noreferrer"> <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/postgresql/postgresql-original-wordmark.svg" alt="postgresql" width="40" height="40"/> </a> <a href="https://www.python.org" target="_blank" rel="noreferrer"> <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" alt="python" width="40" height="40"/> </a> <a href="https://www.rabbitmq.com" target="_blank" rel="noreferrer"> <img src="https://www.vectorlogo.zone/logos/rabbitmq/rabbitmq-icon.svg" alt="rabbitMQ" width="40" height="40"/> </a> <a href="https://fastapi.tiangolo.com/" target="_blank" rel="noreferrer"> <img src="https://www.svgrepo.com/download/330413/fastapi.svg" alt="fastapi" width="40" height="40"/></a><a href="https://www.qemu.org/" target="_blank" rel="noreferrer"> <img src="https://www.svgrepo.com/download/306622/qemu.svg" alt="qemu" width="40" height="40"/> </a></p>
+## Этап 1. Запуск детерминированного RDE-линтера (на базе AST)
+
+Для проверки всех модулей с помощью разработанного инструмента необходимо последовательно запустить скрипт статического анализа для каждого модуля.
+
+**Команды для ручного запуска (Windows/Linux/macOS):**
+
+```bash
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\template\error_specification.md --target openvair/modules/template
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\storage\error_specification.md --target openvair/modules/storage
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\backup\error_specification.md --target openvair/modules/backup
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\event_store\error_specification.md --target openvair/modules/event_store
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\image\error_specification.md --target openvair/modules/image
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\network\error_specification.md --target openvair/modules/network
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\user\error_specification.md --target openvair/modules/user
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\virtual_machines\error_specification.md --target openvair/modules/virtual_machines
+
+python -m openvair.requirements_linter.cli --spec docs\reference\modules\volume\error_specification.md --target openvair/modules/volume
+```
+
+**Ожидаемый результат:** В консоли будет выведено ровно 43 сообщения об ошибках формата `[DDD Violation]`. Зафиксируйте общее время выполнения (ожидаемое время: менее 2 секунд).
 
 ---
 
-## 📦 Installation
+## Этап 2. Запуск верификации через генеративную модель (LLM)
 
-To install **Open vAIR** on a clean Linux system, follow these steps. It is
-recommended to use **Ubuntu 20.04**, which is the most tested version.
-**Ubuntu 22.04** is also supported.
+Для сопоставимости результатов генеративная модель должна работать в режиме строгого бинарного сравнения, аналогично AST-линтеру.
 
-### ☑️ Preparation for Project Installation
+**Порядок действий:**
+1. Откройте интерфейс выбранной Большой Языковой Модели (рекомендуется использовать модели класса Pro с поддержкой загрузки файлов и большим контекстным окном).
+2. Соберите в один архив (или загрузите папками) все 9 файлов `error_specification.md` и все Python-файлы из директории `openvair/modules/`.
+3. Отправьте модели следующий строгий системный промпт вместе с файлами:
 
-1. Ensure all system packages are up to date. Execute the following commands:
+**Системный промпт для LLM:**
 
-    ```shell
-    sudo apt update && sudo apt upgrade -y
-    ```
-    > **Important**: Don't forget to restart the system after executing these
-    commands to apply all changes.
+```text
+Ты — строгий статический анализатор архитектуры (RDE-linter), работающий по принципу точного совпадения строк (Strict String Matching). Твоя задача — провести пакетную сверку архитектурных спецификаций (в формате YAML) с фактическим исходным кодом Python для 9 модулей проекта Open vAIR (архитектура Domain-Driven Design). 
 
-2. Execute the following commands to create and configure a user:
+КРИТИЧЕСКОЕ ПРАВИЛО: 
+Запрещено использовать семантическое сходство, синонимы, лемматизацию или догадки. Сравнение должно быть строго бинарным. Если в спецификации указано "Template", а в коде "TemplateModel" — это ОШИБКА. Если указано "GET", а в коде "POST" — это ОШИБКА. 
 
-    1. Create a user:
+АЛГОРИТМ РАБОТЫ (выполни для КАЖДОГО переданного модуля):
+1. Сопоставь файл спецификации (блок `yaml rde-spec`) с исходным кодом соответствующего модуля.
+2. Проанализируй Python-файлы конкретного модуля по следующим правилам извлечения:
+   - Entrypoints (Endpoints): Ищи декораторы `@router.<method>('<path>', ...)`. Сопоставь HTTP-метод и точный путь.
+   - Entrypoints (CRUD): Ищи класс, оканчивающийся на `Crud`. Извлеки все его публичные методы.
+   - Domain (Models): Ищи классы в слое domain, имена которых НЕ оканчиваются на `Exception` или `Error`.
+   - Service (Managers): Ищи классы в слое service, имена которых оканчиваются на `Manager`.
+   - Service (Services): Ищи публичные методы внутри менеджеров или публичные функции в `services.py`.
+   - Adapters (ORM Models): Ищи классы в `orm.py`, наследующиеся от базового декларативного класса.
+   - Adapters (Serializers): Ищи классы в `serializer.py`, содержащие в названии `Serializer`.
+3. Сравни извлеченные из кода сущности с эталонным контрактом этого модуля. ВСЁ, что заявлено в YAML, ОБЯЗАНО присутствовать в коде с идентичным названием. (Лишнее в коде — игнорируй, нехватка или опечатка в коде по сравнению с YAML — ошибка).
 
-        ```shell
-        sudo useradd -s /bin/bash -d /opt/aero -m aero
-        ```
+ФОРМАТ ВЫВОДА:
+Ты должен выдать ТОЛЬКО единый сводный отчет о десинхронизации. Не пиши рассуждений, вступлений или выводов. Отчет должен быть сгруппирован по модулям. 
+Используй строго следующий формат:
 
-    2. Assign necessary permissions:
+=== MODULE: <Имя модуля> ===
+[DDD Violation] <Слой>: <Тип сущности> '<Ожидаемое значение>' is required but not implemented in the code.
+...
 
-        ```shell
-        sudo chmod +x /opt/aero
-        ```
-
-    3. Add the user to the superuser list:
-
-        ```shell
-        echo "aero ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/aero
-        ```
-
-    4. Switch to the new user:
-
-        ```shell
-        sudo -u aero -i
-        ```
-
-3. Download the project repository:
-
-    ```shell
-    # GitHub
-    git clone https://github.com/Aerodisk/openvair.git
-
-    # GitFlic
-    git clone https://gitflic.ru/project/aerodisk_open_vair/openvair.git
-
-    # GitVerse
-    git clone https://gitverse.ru/Aerodisk/openvair.git
-
-    # GitLab
-    git clone https://git.aerodisk.ru/openvair/openvair.git
-    ```
-
-4. Configure the configuration file:
-
-    ```shell
-    nano ~/openvair/project_config.toml
-    ```
-
-### ⚙️ Project Configuration
-
-Before installing **Open vAIR**, you need to set the login and password in
-the `/opt/aero/openvair/project_config.toml` file. This data is required for
-system authorization and access to all application functions.
-
-Configuration example:
-
-```toml
-[default_user]
-login = ''
-password = ''
+Если в модуле нет расхождений, напиши: "✅ Perfect match!" под его названием.
 ```
 
-Note: The login and password fields must be filled in by the user. Otherwise,
-the installation will be aborted.
-
-### 🌀 Application Tunneling
-If the application needs to be run on a separate host as a server, configure
-tunneling to the virtual network. Determine the local IP address of the host
-by executing the command:
-
-```bash
-ip a
-```
-
-Specify the obtained IP address in the configuration file:
-
-```toml
-[web_app]
-host = '192.168.1.2'
-port = 8000
-```
-
-### 🚀 Starting the Installation
-1. Run the installation script:
-```bash
-./openvair/install.sh
-```
-
-Upon completion of the installation, you will receive a message with the
-current application address, login, and password for working with the system.
-
-### 🗑️ Uninstallation
-To remove Open vAIR, run the uninstallation script:
-```bash
-./openvair/uninstall.sh
-```
-
-### 📚 Documentation
-Documentation can be found in the `/docs/build/index.html` file, which will be
-created after the project installation. Documentation is also available at
-the `/docs/` endpoint after installation is complete.
-
-### 😈 Daemons
-
-#### *web-app* Daemon
-The web-app daemon ensures automatic startup and restart of the main FastAPI
-based application, which is responsible for API and GUI operations. The
-application is accessible at the address specified in the web_app section of
-the config.toml file. By default, this is  `http://127.0.0.1:8000`.
-
-* Check daemon status:
-```bash
-sudo systemctl status web-app.service
-```
-* Restart daemon:
-```bash
-sudo systemctl restart web-app.service
-```
-* Stop daemon:
-```bash
-sudo systemctl stop web-app.service
-```
-* View daemon logs:
-```bash
-sudo journalctl -fu web-app.service
-```
-
-#### *service-layer* Daemon
-Service-layer daemons perform remote function calls of the service layer.
-Each module has its own service-layer daemon. To check the status and view
-logs, use similar commands, changing the service name to
-`<module_name>-service-layer.service`.
-
-For example:
-```bash
-sudo systemctl status storage-service-layer.service
-```
-
-#### *domain* Daemon
-Domain daemons perform remote function calls of the domain layer. Each
-module has its own domain daemon. To check the status and view logs, use
-similar commands, changing the service name to
-`<module_name>-domain.service`.
-```bash
-sudo systemctl status storage-domain.service
-```
-
-### 🔗 Documentation Links
-* Project introduction: [on-boarding](ONBOARDING.md).
-* How to contribute to the project:  [howto-contribute](CONTRIBUTING.md).
-* Code of conduct: [code-of-conduct](CODE_OF_CONDUCT.md).
-* Code convention: [code-convention](CODE_CONVENTION.md).
-
-### 🔗 Frontend of the project
-* To work with the user interface (Frontend), use the repository [Open vAIR UI](https://github.com/Aerodisk/Open-vAIR-UI).
-
-### 🔗 Documentation of the project
-* To work with the documentation, use the repository [Open vAIR docs](https://github.com/Aerodisk/Open-vAIR-docs).
-
-### 🔗 Useful Links
-* [Telegram-channel](https://t.me/Open_vAIR_AERODISK)
-* [Open vAIR website](https://openvair.ru/)
-
-### Statistics (including documentation and frontend projects)
-<p><img align="left" src="https://github-readme-stats.vercel.app/api/top-langs?username=aerodisk&show_icons=true&locale=en&layout=compact" alt="aerodisk" /></p> <p>&nbsp;<img align="center" src="https://github-readme-stats.vercel.app/api?username=aerodisk&show_icons=true&locale=en" alt="aerodisk" /></p>
+**Ожидаемый результат:** Модель сгенерирует текстовый лог с перечислением выявленных ошибок. Зафиксируйте количество найденных дефектов (Recall) и время, затраченное моделью на обработку файлов и генерацию ответа (Execution Time).
 
 ---
 
-### Contribution
-Instructions for contributing to the project:
+## Этап 3. Сведение результатов
 
-1. Fork the repository
-2. Create a new branch (git checkout -b feature/your-feature)
-3. Make changes and commit (git commit -m 'Added new feature')
-4. Push changes (git push origin feature/your-feature)
-5. Create a Pull Request
+По итогам запусков необходимо сравнить:
+1. **Полноту (Recall):** Соотношение найденных ошибок к общему числу заложенных мутаций (43/43).
+2. **Время выполнения (Execution Time):** Скорость локальной работы AST-линтера против задержки ответа API языковой модели.
