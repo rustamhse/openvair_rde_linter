@@ -1,104 +1,158 @@
 #!/usr/bin/env python3
 
-"""Генерирует YAML-спецификацию bounded context из исходников OpenVAir.
+"""Emit a YAML bounded-context spec from OpenVAir sources.
 
-Путь модуля: ``<repo_root>/openvair/modules/<feature>/``.
-
-Алгоритм:
-    1) ``load_module_sources`` читает все ``*.py`` (не ``tests``, не ``__pycache__``).
-    2) ``build_code_artifacts`` восстанавливает те же символы, что увидит линтер позже.
-
-Так файл спеки является «контравариантным» описанием к проверке: если перегенерировать и
-ничего не менять в коде — ``Comparator`` после этого должен сообщать об успехе.
+``load_module_sources`` plus ``build_code_artifacts`` reproduce the linter view.
+Regenerate when the intended public contract changes.
 """
 
 from __future__ import annotations
 
-import argparse
-
-# pathlib и sys: см. ниже вставку корня репозитория в sys.path, чтобы находился пакет requirements_linter
-# при запуске ``python requirements_linter/generate_openvair_specs.py``.
 import sys
+import argparse
 from pathlib import Path
 
-_REPO_ROOT_FOR_IMPORTS = Path(__file__).resolve().parents[1]
-if str(_REPO_ROOT_FOR_IMPORTS) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT_FOR_IMPORTS))
+_BOOT = Path(__file__).resolve().parent.parent
+if str(_BOOT) not in sys.path:
+    sys.path.insert(0, str(_BOOT))
 
-# YAML — человекочитаемый язык описания архитектурного контракта; safe_dump ограничивает типы сериализации.
-import yaml
+from requirements_linter._paths import (  # noqa: E402
+    REPO_ROOT,
+    ensure_repo_root_on_syspath,
+)
 
-from requirements_linter.ast_specs import MODULE_FUNCTIONS_BUCKET, build_code_artifacts, load_module_sources
+ensure_repo_root_on_syspath()
+
+import yaml  # noqa: E402
+
+from requirements_linter.ast_specs import (  # noqa: E402
+    HTTP_ENDPOINTS_BUCKET,
+    MODULE_FUNCTIONS_BUCKET,
+    load_module_sources,
+    build_code_artifacts,
+)
 
 
-def artifacts_to_contract_layers(artifacts: dict[str, dict[str, object]]) -> dict[str, dict]:
-    """Превращает внутренний ``code_artifacts`` в структуру, которую понимает ``Comparator``.
+def _serialize_endpoint_for_yaml(ep: dict[str, object]) -> dict[str, object]:
+    """Serialize one endpoint dict for YAML (drop lint-only ``source_file``)."""
+    raw_params = ep.get('parameters') or []
+    params_in = raw_params if isinstance(raw_params, list) else []
+    params_out = []
+    for p in sorted(params_in, key=lambda row: str(row.get('name', ''))):
+        if not isinstance(p, dict):
+            continue
+        params_out.append(
+            {
+                'name': p['name'],
+                'kind': p['kind'],
+                'required': p['required'],
+                'type_hint': p.get('type_hint') or '',
+            }
+        )
+    return {
+        'method': ep['method'],
+        'path': ep['path'],
+        'handler': ep['handler'],
+        'parameters': params_out,
+    }
 
-    Внутренний формат смешивает классы и ``MODULE_FUNCTIONS_BUCKET``; YAML разделяет их ключами:
-    ``required_classes`` vs ``required_module_functions``.
 
-    Args:
-        artifacts: Результат build_code_artifacts.
+def _layer_classes_map(layer_bucket: dict[str, object]) -> dict[str, list[str]]:
+    sentinel = frozenset({MODULE_FUNCTIONS_BUCKET, HTTP_ENDPOINTS_BUCKET})
+    classes: dict[str, list[str]] = {}
+    for k, v_obj in sorted(layer_bucket.items(), key=lambda item: item[0]):
+        if k in sentinel:
+            continue
+        if isinstance(v_obj, list):
+            classes[str(k)] = [str(x) for x in v_obj]
+    return classes
 
-    Returns:
-        Словарь ``layers.<layer_name>: { required_classes, optional required_module_functions }``.
-    """
+
+def _sorted_endpoints_yaml(
+    layer_bucket: dict[str, object],
+) -> list[dict[str, object]]:
+    eps_raw = layer_bucket.get(HTTP_ENDPOINTS_BUCKET, [])
+    eps_in = eps_raw if isinstance(eps_raw, list) else []
+    rows = [
+        _serialize_endpoint_for_yaml(ep)
+        for ep in eps_in
+        if isinstance(ep, dict)
+    ]
+    rows.sort(
+        key=lambda e: (
+            str(e.get('path', '')),
+            str(e.get('method', '')),
+            str(e.get('handler', '')),
+        )
+    )
+    return rows
+
+
+def artifacts_to_contract_layers(
+    artifacts: dict[str, dict[str, object]],
+) -> dict[str, dict]:
+    """Map ``build_code_artifacts`` output into YAML ``layers`` blocks."""
     layers_out: dict[str, dict] = {}
     for layer_name in sorted(artifacts.keys()):
         layer_bucket = artifacts[layer_name]
 
         mf_raw = layer_bucket.get(MODULE_FUNCTIONS_BUCKET, {})
-        mf_map: dict[str, list[str]] = mf_raw if isinstance(mf_raw, dict) else {}  # type: ignore[assignment]
+        mf_map: dict[str, list[str]] = (
+            mf_raw if isinstance(mf_raw, dict) else {}
+        )
 
-        # Все ключи второго уровня, кроме служебного ведра — имена классов.
-        classes: dict[str, list[str]] = {}
-        for k, v_obj in sorted(layer_bucket.items(), key=lambda item: item[0]):
-            if k == MODULE_FUNCTIONS_BUCKET:
-                continue
-            if isinstance(v_obj, list):
-                classes[str(k)] = [str(x) for x in v_obj]  # type: ignore[list-item]
-
-        required_classes_block = [{'name': cname, 'methods': methods} for cname, methods in sorted(classes.items())]
-
-        layer_doc: dict = {'required_classes': required_classes_block}
+        classes = _layer_classes_map(layer_bucket)
+        req_cls = [
+            {'name': cname, 'methods': methods}
+            for cname, methods in sorted(classes.items())
+        ]
+        layer_doc: dict[str, object] = {'required_classes': req_cls}
 
         mf_entries = [
-            {'relative_path': rel_path_norm, 'functions': fn_list}
-            for rel_path_norm, fn_list in sorted(mf_map.items())
+            {'relative_path': rp, 'functions': fn_list}
+            for rp, fn_list in sorted(mf_map.items())
         ]
-        # Пишем ключ только когда есть топ-уровневые функции (например entrypoints/api.py).
         if mf_entries:
             layer_doc['required_module_functions'] = mf_entries
+
+        endpoints_yaml = _sorted_endpoints_yaml(layer_bucket)
+        if endpoints_yaml:
+            layer_doc['required_http_endpoints'] = endpoints_yaml
 
         layers_out[layer_name] = layer_doc
 
     return layers_out
 
 
-def build_spec_document(feature_name: str, module_root: Path, repo_root: Path) -> dict:
-    """Читает диск целикого bounded context и формирует документ перед записью YAML.
+def build_spec_document(
+    feature_name: str,
+    module_root: Path,
+    repo_root: Path,
+) -> dict:
+    """Read the bounded context on disk and build the document before YAML dump.
 
     Args:
-        feature_name: Имя папки контекста (storage, network, …) — становится ключом ``feature``.
-        module_root: Каталог ``openvair/modules/<feature>``.
-        repo_root: Корень репозитория для ``meta.source`` в относительной форме — пересборка воспроизводима между машинами.
+        feature_name: Context folder name (becomes ``feature`` in YAML).
+        module_root: ``openvair/modules/<feature>``.
+        repo_root: Repository root for ``meta.source`` (relative when possible).
 
     Returns:
-        Словарь готовый к ``yaml.safe_dump``.
+        Dict ready for ``yaml.safe_dump``.
     """
     sources = load_module_sources(module_root)
     artifacts = build_code_artifacts(sources)
+    mod_res = module_root.resolve()
+    repo_res = repo_root.resolve()
     try:
-        source_meta = module_root.resolve().relative_to(repo_root.resolve()).as_posix()
+        rel_meta = mod_res.relative_to(repo_res)
+        source_meta = rel_meta.as_posix()
     except ValueError:
-        source_meta = str(module_root.resolve())
+        source_meta = str(mod_res)
+    maint = 'Snapshot from disk. Trim after review to the public contract.'
     return {
-        # meta — для мэйнтейнеров: автоген не заменяет осмысленный контракт без ревью.
         'meta': {
             'source': source_meta,
-            'maintainer_notes': (
-                'Снимок символов с диска. Удалите лишнее и оставьте только публичный контракт модуля.'
-            ),
+            'maintainer_notes': maint,
         },
         'feature': feature_name,
         'layers': artifacts_to_contract_layers(artifacts),
@@ -106,42 +160,50 @@ def build_spec_document(feature_name: str, module_root: Path, repo_root: Path) -
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    """CLI-парсинг: поддерживаются явные или дефолтные пути внутри рабочей копии."""
-    repo_default = Path(__file__).resolve().parent.parent
+    """Parse CLI args for the spec generator."""
+    repo_default = REPO_ROOT
 
     parser = argparse.ArgumentParser(
         description=(
-            'Сгенерировать YAML-архитектурный контракт для bounded context '
-            '(поддиректория openvair/modules/<feature>).'
+            'Generate a YAML architectural contract for a bounded context '
+            '(subdirectory openvair/modules/<feature>).'
         )
     )
     parser.add_argument(
         '--feature',
         metavar='NAME',
         required=True,
-        help='Имя директории контекста, например storage или virtual_machines',
+        help='Context directory name, e.g. storage or virtual_machines',
     )
     parser.add_argument(
         '--repo-root',
         type=Path,
         default=repo_default,
-        help='Корень репозитория с подкаталогом openvair/ (default: родитель этого пакета)',
+        help=(
+            'Repo root with openvair/ (default: parent of requirements_linter/)'
+        ),
     )
     parser.add_argument(
         '--out-dir',
         type=Path,
         default=repo_default / 'specs',
-        help='Куда сохранять <feature>.yaml (default: specs/ в корне репозитория)',
+        help=(
+            'Directory for <feature>.yaml (default: specs/ under repo root)'
+        ),
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Точка входа: строим документ, печатаем файл, сообщаем путь пользователю."""
+    """CLI entry for writing ``<feature>.yaml`` under ``--out-dir``."""
     opts = parse_args(argv if argv is not None else sys.argv[1:])
 
     module_root = opts.repo_root / 'openvair' / 'modules' / opts.feature
-    doc = build_spec_document(opts.feature, module_root.resolve(), opts.repo_root.resolve())
+    doc = build_spec_document(
+        opts.feature,
+        module_root.resolve(),
+        opts.repo_root.resolve(),
+    )
 
     opts.out_dir.mkdir(parents=True, exist_ok=True)
     out_file = opts.out_dir / f'{opts.feature}.yaml'
@@ -153,7 +215,6 @@ def main(argv: list[str] | None = None) -> int:
         width=120,
     )
 
-    # Path.write_text блокирующая запись целиком маленьких YAML — достаточно для задачи.
     out_file.write_text(dumps, encoding='utf-8')
     print(f'Wrote {out_file}')  # noqa: T201
     return 0

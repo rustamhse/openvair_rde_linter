@@ -145,6 +145,95 @@ layers:
       - get_interfaces
       - turn_off_interface
       - turn_on_interface
+    required_http_endpoints:
+    - method: GET
+      path: /interfaces/
+      handler: get_interfaces
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: InterfaceCrud
+      - name: is_need_filter
+        kind: query
+        required: false
+        type_hint: bool
+    - method: GET
+      path: /interfaces/bridges/
+      handler: get_bridges_list
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: InterfaceCrud
+    - method: POST
+      path: /interfaces/create/
+      handler: bridge_create
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: InterfaceCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.BridgeCreate
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+    - method: DELETE
+      path: /interfaces/delete/
+      handler: bridge_delete
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: InterfaceCrud
+      - name: data
+        kind: query
+        required: true
+        type_hint: List[str]
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+    - method: GET
+      path: /interfaces/{iface_id}/
+      handler: get_interface
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: InterfaceCrud
+      - name: iface_id
+        kind: query
+        required: true
+        type_hint: UUID
+    - method: PUT
+      path: /interfaces/{name}/turn_off
+      handler: turn_off_interface
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: InterfaceCrud
+      - name: name
+        kind: query
+        required: true
+        type_hint: str
+    - method: PUT
+      path: /interfaces/{name}/turn_on
+      handler: turn_on_interface
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: InterfaceCrud
+      - name: name
+        kind: query
+        required: true
+        type_hint: str
   service_layer:
     required_classes:
     - name: BridgeNameDoesNotExistException

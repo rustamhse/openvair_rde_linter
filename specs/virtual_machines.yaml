@@ -189,6 +189,243 @@ layers:
       - shut_off_vm
       - start_vm
       - vnc_vm
+    required_http_endpoints:
+    - method: GET
+      path: /virtual-machines/
+      handler: get_vms
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+    - method: POST
+      path: /virtual-machines/create/
+      handler: create_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.CreateVirtualMachine
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+    - method: DELETE
+      path: /virtual-machines/{vm_id}/
+      handler: delete_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: GET
+      path: /virtual-machines/{vm_id}/
+      handler: get_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: POST
+      path: /virtual-machines/{vm_id}/clone/
+      handler: clone_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.CloneVm
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: POST
+      path: /virtual-machines/{vm_id}/edit/
+      handler: edit_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.EditVm
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: POST
+      path: /virtual-machines/{vm_id}/shut-off/
+      handler: shut_off_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: GET
+      path: /virtual-machines/{vm_id}/snapshots/
+      handler: get_snapshots
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: POST
+      path: /virtual-machines/{vm_id}/snapshots/
+      handler: create_snapshot
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.CreateSnapshot
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: DELETE
+      path: /virtual-machines/{vm_id}/snapshots/{snap_id}
+      handler: delete_snapshot
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: snap_id
+        kind: path
+        required: true
+        type_hint: UUID
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: GET
+      path: /virtual-machines/{vm_id}/snapshots/{snap_id}
+      handler: get_snapshot
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: snap_id
+        kind: path
+        required: true
+        type_hint: UUID
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: POST
+      path: /virtual-machines/{vm_id}/snapshots/{snap_id}/revert
+      handler: revert_snapshot
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: snap_id
+        kind: path
+        required: true
+        type_hint: UUID
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: POST
+      path: /virtual-machines/{vm_id}/start/
+      handler: start_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
+    - method: GET
+      path: /virtual-machines/{vm_id}/vnc/
+      handler: vnc_vm
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: VMCrud
+      - name: user_info
+        kind: depends
+        required: true
+        type_hint: Dict
+      - name: vm_id
+        kind: path
+        required: true
+        type_hint: UUID
   service_layer:
     required_classes:
     - name: ComesEmptyVolumeInfo

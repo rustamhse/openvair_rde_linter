@@ -148,6 +148,115 @@ layers:
       - get_local_disks
       - get_storage
       - get_storages
+    required_http_endpoints:
+    - method: GET
+      path: /storages/
+      handler: get_storages
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+    - method: POST
+      path: /storages/create/
+      handler: create_storage
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.CreateStorage
+      - name: user_data
+        kind: depends
+        required: true
+        type_hint: Dict
+    - method: GET
+      path: /storages/local-disks/
+      handler: get_local_disks
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+      - name: free_local_disks
+        kind: query
+        required: false
+        type_hint: Optional[bool]
+    - method: POST
+      path: /storages/local-disks/create_partition/
+      handler: create_local_partition
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.CreateLocalPartition
+      - name: user_data
+        kind: depends
+        required: true
+        type_hint: Dict
+    - method: DELETE
+      path: /storages/local-disks/delete_partition/
+      handler: delete_local_partition
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+      - name: data
+        kind: body
+        required: true
+        type_hint: schemas.DeleteLocalPartition
+      - name: user_data
+        kind: depends
+        required: true
+        type_hint: Dict
+    - method: GET
+      path: /storages/local-disks/partition_info/
+      handler: get_local_disk_partitions_info
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+      - name: disk_path
+        kind: query
+        required: true
+        type_hint: str
+    - method: GET
+      path: /storages/{storage_id}/
+      handler: get_storage
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+      - name: storage_id
+        kind: query
+        required: true
+        type_hint: UUID
+    - method: DELETE
+      path: /storages/{storage_id}/delete/
+      handler: delete_storage
+      parameters:
+      - name: crud
+        kind: depends
+        required: true
+        type_hint: StorageCrud
+      - name: storage_id
+        kind: query
+        required: true
+        type_hint: UUID
+      - name: user_data
+        kind: depends
+        required: true
+        type_hint: Dict
   service_layer:
     required_classes:
     - name: CannotCreateStorageOnRootOfSystemDisk
