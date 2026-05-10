@@ -144,3 +144,31 @@ class ErrorResponse(APIConfigResponseModel):
         examples=["Job with the specified ID does not exist"],
         description="Additional details about the error, if provided",
     )
+
+
+class CreateJobResponse(JobCreateResponse):
+    """Backward-compatible alias matching external API contract naming."""
+
+
+class DeleteResponse(JobDeleteResponse):
+    """Backward-compatible alias matching external API contract naming."""
+
+
+class JobStatusResponse(APIConfigResponseModel):
+    """Schema representing job execution/enabled status."""
+
+    job_id: UUID = Field(
+        ...,
+        examples=["e8d321b7-1a34-4a12-91cf-7dbbf017e8a3"],
+        description="Identifier of the scheduler job",
+    )
+    enabled: bool = Field(
+        ...,
+        examples=[True],
+        description="Current enabled state of the job",
+    )
+    status: str = Field(
+        ...,
+        examples=["scheduled"],
+        description="Current job status label",
+    )

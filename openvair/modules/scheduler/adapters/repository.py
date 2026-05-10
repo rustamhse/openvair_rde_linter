@@ -56,3 +56,31 @@ class SchedulerSqlAlchemyRepository(BaseSqlAlchemyRepository[SchedulerJob]):
     def delete(self, job: SchedulerJob) -> None:
         """Delete job from session."""
         self.session.delete(job)
+
+
+class SqlAlchemySchedulerRepository(SchedulerSqlAlchemyRepository):
+    """Compatibility alias for repository naming in requirements."""
+
+    def add(self, job: SchedulerJob) -> None:
+        """Add a scheduler job entity."""
+        super().add(job)
+
+    def get(self, job_id: UUID) -> Optional[SchedulerJob]:
+        """Get scheduler job entity by identifier."""
+        return super().get_by_id(job_id)
+
+    def get_all(self) -> List[SchedulerJob]:
+        """Get all scheduler job entities."""
+        return super().get_all()
+
+    def update(self, job: SchedulerJob) -> None:
+        """Persist updated scheduler job entity in current session."""
+        self.session.add(job)
+
+    def delete(self, job: SchedulerJob) -> None:
+        """Delete scheduler job entity."""
+        super().delete(job)
+
+    def get_by_name(self, job_name: str) -> Optional[SchedulerJob]:
+        """Get scheduler job by unique name."""
+        return super().get_by_name(job_name)

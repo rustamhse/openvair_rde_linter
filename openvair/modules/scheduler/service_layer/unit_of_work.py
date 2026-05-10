@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from openvair.modules.scheduler.config import DEFAULT_SESSION_FACTORY
 from openvair.common.uow.base_sqlalchemy import BaseSqlAlchemyUnitOfWork
 from openvair.modules.scheduler.adapters.repository import (
-    SchedulerSqlAlchemyRepository,
+    SqlAlchemySchedulerRepository,
 )
 
 
@@ -40,4 +40,4 @@ class SchedulerSqlAlchemyUnitOfWork(BaseSqlAlchemyUnitOfWork):
 
     def _init_repositories(self) -> None:
         """Initializes repositories for the template module."""
-        self.jobs = SchedulerSqlAlchemyRepository(self.session)
+        self.jobs = SqlAlchemySchedulerRepository(self.session)

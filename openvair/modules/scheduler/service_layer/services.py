@@ -1,4 +1,5 @@
 """Scheduler service basic operations (get, create, edit, delete)."""
+
 import datetime
 from uuid import UUID
 from typing import Any, Set, Dict, List
@@ -9,6 +10,7 @@ from crontab import CronSlices  # TODO: uberi nenujnie validacii
 from openvair.libs.log import get_logger
 from openvair.modules.base_manager import BackgroundTasks, periodic_task
 from openvair.modules.scheduler.config import (
+    MAX_CONCURRENT_JOBS,
     API_SERVICE_LAYER_QUEUE_NAME,
     SERVICE_LAYER_DOMAIN_QUEUE_NAME,
 )
@@ -19,6 +21,7 @@ from openvair.modules.scheduler.adapters.serializer import (
 )
 from openvair.modules.scheduler.service_layer.exceptions import (
     JobNotFoundError,
+    JobDependencyError,
     JobInvalidNameError,
     JobNameAlreadyExists,
     JobFieldIsNotEditable,
@@ -92,6 +95,17 @@ class SchedulerServiceLayerManager(BackgroundTasks):
             raise JobInvalidCronExpression(message)
 
         with self.uow() as uow:
+            active_jobs = [job for job in uow.jobs.get_all() if job.enabled]
+            if (
+                data.get('enabled', True)
+                and len(active_jobs) >= MAX_CONCURRENT_JOBS
+            ):
+                message = (
+                    f'Maximum number of active jobs reached: '
+                    f'{MAX_CONCURRENT_JOBS}'
+                )
+                raise JobInvalidNameError(message)
+
             if uow.jobs.get_by_name(data['name']):
                 message = 'Job with that name already exists'
                 raise JobNameAlreadyExists(message)
@@ -155,7 +169,7 @@ class SchedulerServiceLayerManager(BackgroundTasks):
             raise JobNotFoundError(message)
         return job
 
-    def _validate_edit_data(
+    def _validate_edit_data(  # noqa: C901
         self,
         u: 'SchedulerSqlAlchemyUnitOfWork',
         job: SchedulerJob,
@@ -192,6 +206,15 @@ class SchedulerServiceLayerManager(BackgroundTasks):
             message = f'Field(s) {invalid} are not editable or do not exist.'
             raise JobFieldIsNotEditable(message)
 
+        if data.get('enabled') is True and not job.enabled:
+            active_jobs = [item for item in u.jobs.get_all() if item.enabled]
+            if len(active_jobs) >= MAX_CONCURRENT_JOBS:
+                message = (
+                    f'Maximum number of active jobs reached: '
+                    f'{MAX_CONCURRENT_JOBS}'
+                )
+                raise JobFieldIsNotEditable(message)
+
         return allowed_fields
 
     def delete_job(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -204,6 +227,13 @@ class SchedulerServiceLayerManager(BackgroundTasks):
             if not job:
                 message = 'Job id does not exist'
                 raise JobNotFoundError(message)
+
+            if job.enabled:
+                message = (
+                    'Cannot delete enabled job. '
+                    'Disable job first to satisfy dependency checks.'
+                )
+                raise JobDependencyError(message)
 
             uow.jobs.delete(job)
             uow.commit()
@@ -331,3 +361,23 @@ class SchedulerServiceLayerManager(BackgroundTasks):
                 f"DB({db_job.enabled}) -> OS({os_enabled})"
             )
             db_job.enabled = os_enabled
+
+
+class SchedulerService(SchedulerServiceLayerManager):
+    """Compatibility alias for requirements naming."""
+
+    def get_all_jobs(self) -> List[Dict[str, Any]]:
+        """Retrieve all scheduler jobs."""
+        return super().get_all_jobs()
+
+    def create_job(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a scheduler job."""
+        return super().create_job(data)
+
+    def edit_job(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Edit scheduler job payload."""
+        return super().edit_job(payload)
+
+    def delete_job(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Delete scheduler job payload."""
+        return super().delete_job(payload)

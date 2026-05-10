@@ -22,30 +22,37 @@ Dependencies:
 from uuid import UUID
 from typing import List
 
-from fastapi import Depends, APIRouter, status
+from fastapi import Body, Depends, APIRouter, status
 from fastapi_pagination import Page, Params, paginate
 from starlette.concurrency import run_in_threadpool
 
 from openvair.libs.log import get_logger
 from openvair.common.schemas import BaseResponse
 from openvair.libs.auth.jwt_utils import get_current_user
-from openvair.modules.scheduler.entrypoints.crud import SchedulerCrud
-from openvair.modules.scheduler.entrypoints.schemas.requests import (
-    RequestCreateJob,
-    RequestUpdateJob,
-)
+from openvair.modules.scheduler.entrypoints.crud import SchedulerCRUD
+from openvair.modules.scheduler.entrypoints.schemas import requests as schemas
 from openvair.modules.scheduler.entrypoints.schemas.responses import (
     JobResponse,
+    ErrorResponse,
 )
 
 LOG = get_logger(__name__)
+ERROR_RESPONSES = {
+    400: {'model': ErrorResponse, 'description': 'Bad Request'},
+    404: {'model': ErrorResponse, 'description': 'Job not found'},
+    409: {'model': ErrorResponse, 'description': 'Conflict'},
+    422: {'model': ErrorResponse, 'description': 'Validation error'},
+    500: {'model': ErrorResponse, 'description': 'Internal server error'},
+}
+DELETE_BODY_DEFAULT = Body(default=None)
+
 router = APIRouter(
     prefix='/scheduler',
     tags=['scheduler'],
     dependencies=[
         Depends(get_current_user)
     ],  # Глобальная авторизация для всех эндпоинтов
-    responses={404: {'description': 'Not found!'}},
+    responses=ERROR_RESPONSES,
 )
 
 
@@ -53,9 +60,10 @@ router = APIRouter(
     '/jobs',
     response_model=BaseResponse[Page[JobResponse]],
     status_code=status.HTTP_200_OK,
+    responses=ERROR_RESPONSES,
 )
 async def get_jobs(
-    crud: SchedulerCrud = Depends(SchedulerCrud),
+    crud: SchedulerCRUD = Depends(SchedulerCRUD),
     params: Params = Depends(),
 ) -> BaseResponse[Page[JobResponse]]:
     """Retrieve a paginated list of all scheduled jobs.
@@ -66,7 +74,7 @@ async def get_jobs(
     LOG.info('Api handle request on getting jobs')
 
     jobs: List[JobResponse] = await run_in_threadpool(
-        crud.get_all_jobs
+        crud.get_jobs
     )
     paginated_jobs = paginate(jobs, params)
 
@@ -78,10 +86,11 @@ async def get_jobs(
     '/jobs/{job_id}',
     response_model=BaseResponse[JobResponse],
     status_code=status.HTTP_200_OK,
+    responses=ERROR_RESPONSES,
 )
 async def get_job(
     job_id: UUID,
-    crud: SchedulerCrud = Depends(SchedulerCrud),
+    crud: SchedulerCRUD = Depends(SchedulerCRUD),
 ) -> BaseResponse[JobResponse]:
     """Retrieve details of a specific scheduled job by its ID.
 
@@ -103,10 +112,11 @@ async def get_job(
     '/jobs',
     response_model=BaseResponse[JobResponse],
     status_code=status.HTTP_201_CREATED,
+    responses=ERROR_RESPONSES,
 )
 async def create_job(
-    data: RequestCreateJob,
-    crud: SchedulerCrud = Depends(SchedulerCrud),
+    data: schemas.CreateJobRequest,
+    crud: SchedulerCRUD = Depends(SchedulerCRUD),
 ) -> BaseResponse:
     """Create a new scheduled job and sync it with the OS crontab.
 
@@ -122,14 +132,15 @@ async def create_job(
 
 
 @router.patch(
-    '/{job_id}',
+    '/jobs/{job_id}',
     response_model=BaseResponse[JobResponse],
     status_code=status.HTTP_200_OK,
+    responses=ERROR_RESPONSES,
 )
-async def edit_job(
+async def update_job(
     job_id: UUID,
-    data: RequestUpdateJob,
-    crud: SchedulerCrud = Depends(SchedulerCrud),
+    data: schemas.UpdateJobRequest,
+    crud: SchedulerCRUD = Depends(SchedulerCRUD),
 ) -> BaseResponse:
     """Update an existing scheduled job's parameters.
 
@@ -138,7 +149,7 @@ async def edit_job(
     """
     LOG.info(f'Api handle request on editing job {job_id}')
 
-    job = await run_in_threadpool(crud.edit_job, job_id, data)
+    job = await run_in_threadpool(crud.update_job, job_id, data)
 
     LOG.info(
         f'Api request on editing job {job_id}'
@@ -148,13 +159,15 @@ async def edit_job(
 
 
 @router.delete(
-    '/{job_id}',
+    '/jobs/{job_id}',
     response_model=BaseResponse[JobResponse],
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
+    responses=ERROR_RESPONSES,
 )
 async def delete_job(
     job_id: UUID,
-    crud: SchedulerCrud = Depends(SchedulerCrud),
+    data: schemas.DeleteJobRequest = DELETE_BODY_DEFAULT,
+    crud: SchedulerCRUD = Depends(SchedulerCRUD),
 ) -> BaseResponse:
     """Delete a scheduled job from the database and OS crontab by its ID.
 
@@ -162,6 +175,7 @@ async def delete_job(
         BaseResponse[JobResponse]: Data of the deleted job.
     """
     LOG.info(f'Api handle request on deleting job {job_id}')
+    _ = data
 
     job = await run_in_threadpool(crud.delete_job, job_id)
 
@@ -170,3 +184,12 @@ async def delete_job(
         'was successfully processed'
     )
     return BaseResponse(status='success', data=job)
+
+
+async def edit_job(
+    job_id: UUID,
+    data: schemas.UpdateJobRequest,
+    crud: SchedulerCRUD = Depends(SchedulerCRUD),
+) -> BaseResponse:
+    """Backward-compatible alias for update_job handler name."""
+    return await update_job(job_id, data, crud)

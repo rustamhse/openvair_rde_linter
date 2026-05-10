@@ -21,6 +21,20 @@ from pydantic import Field, field_validator
 from openvair.modules.scheduler.config import validate_command
 from openvair.common.base_pydantic_models import APIConfigRequestModel
 
+MIN_CRON_FIELDS = 5
+
+
+def _enforce_minute_granularity(cron_value: str) -> str:
+    """Ensure cron expression doesn't schedule more often than 1 minute."""
+    parts = cron_value.split()
+    if len(parts) != MIN_CRON_FIELDS:
+        msg = (
+            'Cron expression must contain exactly 5 fields '
+            '(minute granularity)'
+        )
+        raise ValueError(msg)
+    return cron_value
+
 
 class RequestCreateJob(APIConfigRequestModel):
     """Schema for creating a new scheduled job.
@@ -79,7 +93,7 @@ class RequestCreateJob(APIConfigRequestModel):
         if not CronSlices.is_valid(value.strip()):
             msg = f"Invalid cron expression: {value}"
             raise ValueError(msg)
-        return value.strip()
+        return _enforce_minute_granularity(value.strip())
 
     @field_validator("name", mode="before")
     @classmethod
@@ -147,7 +161,7 @@ class RequestUpdateJob(APIConfigRequestModel):
         if not CronSlices.is_valid(value.strip()):
             msg = f"Invalid cron expression: {value}"
             raise ValueError(msg)
-        return value.strip()
+        return _enforce_minute_granularity(value.strip())
 
     @field_validator("name", mode="before")
     @classmethod
@@ -171,3 +185,15 @@ class RequestDeleteJob(APIConfigRequestModel):
         examples=['a73f920b-d282-41e4-8ec1-6e6b89d3a9e7'],
         description='Unique identifier of the job to delete',
     )
+
+
+class CreateJobRequest(RequestCreateJob):
+    """Backward-compatible alias matching external API contract naming."""
+
+
+class UpdateJobRequest(RequestUpdateJob):
+    """Backward-compatible alias matching external API contract naming."""
+
+
+class DeleteJobRequest(RequestDeleteJob):
+    """Backward-compatible alias matching external API contract naming."""
