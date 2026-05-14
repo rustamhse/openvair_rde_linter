@@ -1,6 +1,5 @@
 meta:
   source: openvair/modules/scheduler
-  maintainer_notes: Контракт модуля scheduler на основе ТЗ заказчика для проверки requirements_linter.
 feature: scheduler
 layers:
   adapters:
@@ -153,7 +152,7 @@ layers:
         type_hint: UUID
       - name: data
         kind: body
-        required: false
+        required: true
         type_hint: schemas.DeleteJobRequest
   service_layer:
     required_classes:

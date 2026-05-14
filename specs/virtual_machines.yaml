@@ -1,6 +1,5 @@
 meta:
   source: openvair/modules/virtual_machines
-  maintainer_notes: Снимок символов с диска. Удалите лишнее и оставьте только публичный контракт модуля.
 feature: virtual_machines
 layers:
   adapters:

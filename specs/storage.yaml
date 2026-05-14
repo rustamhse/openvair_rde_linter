@@ -1,6 +1,5 @@
 meta:
   source: openvair/modules/storage
-  maintainer_notes: Снимок символов с диска. Удалите лишнее и оставьте только публичный контракт модуля.
 feature: storage
 layers:
   adapters:

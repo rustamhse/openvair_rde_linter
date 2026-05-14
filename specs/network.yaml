@@ -1,6 +1,5 @@
 meta:
   source: openvair/modules/network
-  maintainer_notes: Снимок символов с диска. Удалите лишнее и оставьте только публичный контракт модуля.
 feature: network
 layers:
   adapters:

@@ -1,6 +1,5 @@
 meta:
   source: openvair/modules/block_device
-  maintainer_notes: Снимок символов с диска. Удалите лишнее и оставьте только публичный контракт модуля.
 feature: block_device
 layers:
   adapters:
