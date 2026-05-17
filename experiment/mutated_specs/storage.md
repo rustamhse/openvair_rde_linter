@@ -1,3 +1,11 @@
+# Open vAIR contract (mutated benchmark): storage
+
+Архитектурный контракт модуля `storage` для RDE-линтера.
+Источник кода: `openvair/modules/storage`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/storage
 feature: storage
@@ -29,6 +37,21 @@ layers:
       - get_spec_by_key_value
       - get_storage_by_name
       - update_spec_by_key_for_storage
+    - name: PhantomRde_storage_adapters_1
+      methods:
+      - run
+    - name: PhantomRde_storage_adapters_2
+      methods:
+      - run
+    - name: PhantomRde_storage_adapters_3
+      methods:
+      - run
+    - name: PhantomRde_storage_adapters_4
+      methods:
+      - run
+    - name: PhantomRde_storage_adapters_5
+      methods:
+      - run
   domain:
     required_classes:
     - name: AbstractStorageFactory
@@ -295,3 +318,4 @@ layers:
       methods: []
     - name: StorageStatusError
       methods: []
+```

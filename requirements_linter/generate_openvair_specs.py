@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Emit a YAML bounded-context spec from OpenVAir sources.
+"""Emit a Markdown bounded-context spec (``rde`` block) from OpenVAir sources.
 
 ``load_module_sources`` plus ``build_code_artifacts`` reproduce the linter view.
 Regenerate when the intended public contract changes.
@@ -23,14 +23,13 @@ from requirements_linter._paths import (  # noqa: E402
 
 ensure_repo_root_on_syspath()
 
-import yaml  # noqa: E402
-
 from requirements_linter.ast_specs import (  # noqa: E402
     HTTP_ENDPOINTS_BUCKET,
     MODULE_FUNCTIONS_BUCKET,
     load_module_sources,
     build_code_artifacts,
 )
+from requirements_linter.spec_document import contract_to_markdown  # noqa: E402
 
 
 def _serialize_endpoint_for_yaml(ep: dict[str, object]) -> dict[str, object]:
@@ -165,8 +164,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         description=(
-            'Generate a YAML architectural contract for a bounded context '
-            '(subdirectory openvair/modules/<feature>).'
+            'Generate specs/<feature>.md (``rde`` contract) for a bounded '
+            'context (subdirectory openvair/modules/<feature>).'
         )
     )
     parser.add_argument(
@@ -188,14 +187,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         type=Path,
         default=repo_default / 'specs',
         help=(
-            'Directory for <feature>.yaml (default: specs/ under repo root)'
+            'Directory for <feature>.md (default: specs/ under repo root)'
         ),
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry for writing ``<feature>.yaml`` under ``--out-dir``."""
+    """CLI entry for writing ``<feature>.md`` under ``--out-dir``."""
     opts = parse_args(argv if argv is not None else sys.argv[1:])
 
     module_root = opts.repo_root / 'openvair' / 'modules' / opts.feature
@@ -206,16 +205,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     opts.out_dir.mkdir(parents=True, exist_ok=True)
-    out_file = opts.out_dir / f'{opts.feature}.yaml'
+    out_file = opts.out_dir / f'{opts.feature}.md'
 
-    dumps = yaml.safe_dump(
-        doc,
-        sort_keys=False,
-        allow_unicode=True,
-        width=120,
-    )
-
-    out_file.write_text(dumps, encoding='utf-8')
+    out_file.write_text(contract_to_markdown(doc), encoding='utf-8')
     print(f'Wrote {out_file}')  # noqa: T201
     return 0
 

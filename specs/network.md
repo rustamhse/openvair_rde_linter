@@ -1,3 +1,11 @@
+# Open vAIR contract: network
+
+Архитектурный контракт модуля `network` для RDE-линтера.
+Источник кода: `openvair/modules/network`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/network
 feature: network
@@ -269,3 +277,4 @@ layers:
       methods: []
     - name: UnexpectedDataArguments
       methods: []
+```

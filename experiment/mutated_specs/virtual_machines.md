@@ -1,3 +1,11 @@
+# Open vAIR contract (mutated benchmark): virtual_machines
+
+Архитектурный контракт модуля `virtual_machines` для RDE-линтера.
+Источник кода: `openvair/modules/virtual_machines`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/virtual_machines
 feature: virtual_machines
@@ -45,6 +53,21 @@ layers:
       methods: []
     - name: VirtualMachines
       methods: []
+    - name: PhantomRde_virtual_machines_adapters_1
+      methods:
+      - run
+    - name: PhantomRde_virtual_machines_adapters_2
+      methods:
+      - run
+    - name: PhantomRde_virtual_machines_adapters_3
+      methods:
+      - run
+    - name: PhantomRde_virtual_machines_adapters_4
+      methods:
+      - run
+    - name: PhantomRde_virtual_machines_adapters_5
+      methods:
+      - run
   domain:
     required_classes:
     - name: AbstractVMDriverFactory
@@ -484,3 +507,4 @@ layers:
       methods: []
     - name: VolumeStatusIsError
       methods: []
+```

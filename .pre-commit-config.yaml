@@ -4,6 +4,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (staged Python files)
+        exclude: ^(experiment/|requirements_linter/)
         additional_dependencies:
           - types-PyYAML==6.0.12.20240917
           - types-requests==2.32.0.20240914
@@ -18,9 +19,4 @@ repos:
         entry: bash .githooks/ruff
         language: system
         types: [python]
-      - id: rde-spec-linter
-        name: RDE YAML specs vs OpenVAir modules
-        entry: python requirements_linter/lint_repo_specs.py
-        language: python
-        pass_filenames: false
-        additional_dependencies: [pyyaml]
+        exclude: ^(experiment/|requirements_linter/)

@@ -119,7 +119,7 @@ def test_comparator_http_contract_ok() -> None:
             },
         },
     }
-    assert Comparator(spec, arts).compare() == []
+    assert Comparator(spec, arts).compare().errors == []
 
 
 def test_comparator_http_contract_param_mismatch() -> None:
@@ -148,14 +148,14 @@ def test_comparator_http_contract_param_mismatch() -> None:
             },
         },
     }
-    errs = Comparator(spec, arts).compare()
-    assert len(errs) == 1
-    assert 'parameter contract mismatch' in errs[0]
+    result = Comparator(spec, arts).compare()
+    assert len(result.errors) == 1
+    assert 'parameter contract mismatch' in result.errors[0]
 
 
 def test_demo_pipeline_regression() -> None:
     """Synthetic demo YAML and sources remain aligned."""
-    assert run_demo_pipeline() == []
+    assert run_demo_pipeline().errors == []
 
 
 def test_build_code_artifacts_has_http_bucket() -> None:

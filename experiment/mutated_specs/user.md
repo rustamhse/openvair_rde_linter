@@ -1,3 +1,11 @@
+# Open vAIR contract (mutated benchmark): user
+
+Архитектурный контракт модуля `user` для RDE-линтера.
+Источник кода: `openvair/modules/user`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/user
 feature: user
@@ -16,6 +24,21 @@ layers:
     - name: UserSqlAlchemyRepository
       methods:
       - get_by_name
+    - name: PhantomRde_user_adapters_1
+      methods:
+      - run
+    - name: PhantomRde_user_adapters_2
+      methods:
+      - run
+    - name: PhantomRde_user_adapters_3
+      methods:
+      - run
+    - name: PhantomRde_user_adapters_4
+      methods:
+      - run
+    - name: PhantomRde_user_adapters_5
+      methods:
+      - run
   entrypoints:
     required_classes:
     - name: BaseUser
@@ -169,3 +192,4 @@ layers:
       methods: []
     - name: WrongUserIdProvided
       methods: []
+```

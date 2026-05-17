@@ -1,3 +1,11 @@
+# Open vAIR contract (mutated benchmark): template
+
+Архитектурный контракт модуля `template` для RDE-линтера.
+Источник кода: `openvair/modules/template`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/template
 feature: template
@@ -54,6 +62,21 @@ layers:
       methods: []
     - name: VolumeModelDTO
       methods: []
+    - name: PhantomRde_template_adapters_1
+      methods:
+      - run
+    - name: PhantomRde_template_adapters_2
+      methods:
+      - run
+    - name: PhantomRde_template_adapters_3
+      methods:
+      - run
+    - name: PhantomRde_template_adapters_4
+      methods:
+      - run
+    - name: PhantomRde_template_adapters_5
+      methods:
+      - run
   domain:
     required_classes:
     - name: AbstractTemplateFactory
@@ -187,3 +210,4 @@ layers:
       methods: []
     - name: VolumeRetrievalException
       methods: []
+```

@@ -1,3 +1,11 @@
+# Open vAIR contract: virtual_network
+
+Архитектурный контракт модуля `virtual_network` для RDE-линтера.
+Источник кода: `openvair/modules/virtual_network`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/virtual_network
 feature: virtual_network
@@ -279,3 +287,4 @@ layers:
       - turn_on_virtual_network
     - name: VirtualNetworkSqlAlchemyUnitOfWork
       methods: []
+```

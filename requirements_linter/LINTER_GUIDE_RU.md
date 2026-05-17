@@ -1,67 +1,80 @@
-# RDE Linter: Полное руководство (RU)
+# RDE Linter: полное руководство (RU)
 
-Настоящий документ представляет собой практическое руководство по YAML-линтеру
-`requirements_linter`.
+Практическое руководство по линтеру архитектурных контрактов `requirements_linter` для Open vAIR.
 
-Цель линтера:
-- сравнить контракт из `specs/<feature>.yaml`;
-- с реальным Python-кодом в `openvair/modules/<feature>/`;
-- через AST-анализ (без запуска приложения, без тестов, без импорта
-  бизнес-логики).
+**Что делает линтер:**
 
----
-
-## 1. Функциональное назначение линтера
-
-Линтер анализирует YAML-спецификацию и проверяет, что в кодовой базе
-**действительно присутствуют**
-все объявленные там публичные сущности:
-- классы и их публичные методы;
-- top-level функции в конкретных файлах;
-- FastAPI endpoints (метод, путь, handler, параметры).
-
-Важно:
-- линтер проверяет только направление **spec -> code**;
-- если в коде есть что-то лишнее, чего нет в YAML, это **не ошибка**;
-- если в YAML заявлено что-то, чего нет в коде, это **ошибка**.
+- читает контракт из `specs/<feature>.md` (YAML внутри fenced-блока `rde`);
+- сканирует Python в `openvair/modules/<feature>/`;
+- сравнивает spec и код **только через AST** (без запуска приложения, тестов и импорта бизнес-логики).
 
 ---
 
-## 2. Что именно валидируется
+## 1. Функциональное назначение
 
-Проверка идет по слоям (обычно `domain`, `service_layer`, `adapters`,
-`entrypoints`).
+Линтер проверяет, что в коде **присутствуют** все сущности, заявленные в контракте:
 
-### 2.1 `required_classes`
+| Тип | Что сверяется |
+|-----|----------------|
+| Классы | Имя класса и перечисленные **публичные** методы |
+| Функции модуля | Top-level `def` / `async def` в указанном файле |
+| HTTP (FastAPI) | Метод, полный путь, handler, параметры |
 
-Для каждого класса:
-- должен существовать класс с таким именем;
-- должны существовать все методы из `methods`.
+### Ошибки и предупреждения
 
-Ограничение:
-- учитываются только публичные имена; 
-- методы/функции с `_` как начало имени
-  считаются непубличными контрактно.
+| Тип | Направление | Код выхода | Отключение |
+|-----|-------------|------------|------------|
+| **Ошибка** | spec → code: в контракте есть, в коде нет | `1` | — |
+| **WARNINGS** | code → spec: в коде есть публичная сущность, в контракте нет | `0` | `--no-warn-extras` |
 
-### 2.2 `required_module_functions`
-
-Проверяются top-level `def`/`async def` в указанном файле:
-- `relative_path` задается от корня модуля (`openvair/modules/<feature>/`);
-- в `functions` перечисляются ожидаемые callables.
-
-### 2.3 `required_http_endpoints`
-
-Для FastAPI проверяются:
-- `method` (GET/POST/PATCH/...),
-- `path`,
-- `handler`,
-- `parameters` (name, kind, required, type_hint).
-
-Сопоставление параметров строгое по сигнатуре.
+Имена классов **не должны** совпадать со служебными: `$module_functions$`, `$http_endpoints$`.
 
 ---
 
-## 3. Минимальная правильная структура YAML
+## 2. Формат контракта
+
+### 2.1 Файл `specs/<feature>.md`
+
+В начале — заголовок и пояснение для человека. Машиночитаемая часть — блок:
+
+````markdown
+# Open vAIR contract: my_feature
+
+Описание модуля…
+
+```rde
+meta:
+  source: openvair/modules/my_feature
+feature: my_feature
+layers:
+  domain:
+    required_classes: []
+```
+````
+
+Загрузка: `spec_document.load_spec` → `extract_rde_block` → `yaml.safe_load` → `normalize_contract_document`.
+
+Поддерживаются устаревшие отдельные файлы `specs/<feature>.yaml` / `.yml`.
+
+### 2.2 Слои DDD
+
+Проверка идёт по каталогам: `domain`, `service_layer`, `adapters`, `entrypoints` (константа `KNOWN_LAYER_NAMES`).
+
+### 2.3 Ключи в YAML внутри `rde`
+
+| Ключ | Назначение |
+|------|------------|
+| `required_classes` | Класс + список публичных методов |
+| `required_module_functions` | `relative_path` от корня модуля + список функций |
+| `required_http_endpoints` | method, path, handler, parameters |
+
+**Сокращённая запись** (нормализуется при загрузке): `classes`, `module_functions`, `http` с `router_prefix` / `endpoints`.
+
+Публичность: имена с `_` в начале и дандеры `__…__` не считаются публичным API.
+
+---
+
+## 3. Минимальный пример контракта (YAML в блоке `rde`)
 
 ```yaml
 meta:
@@ -100,285 +113,240 @@ layers:
 
 ---
 
-## 4. Как формировать спецификацию для стабильного прохождения проверки
+## 4. Как писать спецификацию, чтобы проверка проходила
 
-### 4.1 Имена должны совпадать один-в-один
+### 4.1 Имена — один в один
 
-- класс: `SchedulerCRUD` != `SchedulerCrud`;
-- функция: `update_job` != `edit_job`;
-- type_hint: `schemas.CreateJobRequest` != `CreateJobRequest`.
+- `SchedulerCRUD` ≠ `SchedulerCrud`
+- `update_job` ≠ `edit_job`
+- `schemas.CreateJobRequest` ≠ `CreateJobRequest`
 
-### 4.2 Для `required_module_functions` путь должен быть реальным
+### 4.2 `relative_path` должен существовать
 
-Пример:
-- если функция живет в `openvair/modules/user/entrypoints/api.py`,
-  то `relative_path` должен быть ровно `entrypoints/api.py`.
+Функция в `openvair/modules/user/entrypoints/api.py` → в контракте `entrypoints/api.py`.
 
-### 4.3 Для HTTP важно все сразу
+### 4.3 HTTP: тройка method + path + handler
 
-Линтер сверяет endpoint по тройке:
-- method + path + handler.
+При несовпадении: `No matching HTTP route in code for ...`
 
-Если не совпало хоть одно, получите:
-- `No matching HTTP route in code for ...`
+При расхождении параметров: `parameter contract mismatch` (списки `spec:` и `code:`).
 
-Если endpoint найден, но не совпали параметры:
-- `parameter contract mismatch` с `spec:` и `code:` списками.
+### 4.4 Эвристики параметров HTTP
 
-### 4.4 Учитывайте эвристики по типам параметров
+| В коде | `kind` в spec |
+|--------|----------------|
+| `Depends(...)` | `depends` |
+| `Body` / `Form` / `File` | `body` |
+| Аннотация `schemas.*` | часто `body` |
+| Остальное | обычно `query` |
 
-Внутри HTTP-анализатора:
-- `Depends(...)` -> `kind: depends`;
-- `Body(...)`, `Form(...)`, `File(...)` -> `kind: body`;
-- для аннотаций вида `schemas.Model` тоже часто выводится `body`;
-- остальное обычно трактуется как `query`.
-
-Поэтому safest-подход:
-- сначала сгенерировать спецификацию;
-- потом уже вручную подправлять только нужное.
+Рекомендация: сначала автогенерация, затем ручная чистка до публичного контракта.
 
 ---
 
-## 5. Как запускать
+## 5. Запуск
 
-## 5.1 Один модуль (рекомендуется в работе)
+### 5.1 Один модуль (рекомендуется при разработке)
 
 Из корня репозитория:
 
 ```bash
-python requirements_linter/rde_linter.py specs/user.yaml openvair/modules/user
+python requirements_linter/rde_linter.py specs/user.md openvair/modules/user
 ```
 
-Коды возврата:
-- `0` - mismatch нет;
-- `1` - mismatch есть.
+Демо без диска:
 
-### 5.2 Важно про запуск без аргументов
+```bash
+python requirements_linter/rde_linter.py --demo
+```
 
-Если запустить:
+Коды возврата: `0` — нет ошибок spec → code; `1` — есть ошибки. WARNINGS на код выхода не влияют.
+
+### 5.2 Запуск без аргументов
 
 ```bash
 python requirements_linter/rde_linter.py
 ```
 
-по умолчанию проверится только:
-- `specs/storage.yaml`
-- `openvair/modules/storage`
+По умолчанию проверяются только:
 
-Это частая причина "почему мой модуль не проверился".
+- `specs/storage.md`
+- `openvair/modules/storage/`
 
-### 5.3 Проверка всех спецификаций
+Частая причина «мой модуль не проверился» — не переданы пути явно.
+
+### 5.3 Все спецификации
 
 ```bash
 python requirements_linter/lint_repo_specs.py
 ```
 
-Скрипт берет каждый `specs/*.yaml`, определяет feature и проверяет
-`openvair/modules/<feature>`.
+Для каждого `specs/*.md` (если нет `.md` — устаревшие `*.yaml` без пары `.md`):
 
-Если `feature` в YAML нет - берется имя файла.
+- `feature` из контракта → `openvair/modules/<feature>/`;
+- если `feature` нет — имя файла без расширения (`user.md` → `user`).
+
+Pre-commit: хук `rde-spec-linter` вызывает этот же скрипт.
+
+```bash
+pre-commit install
+pre-commit run rde-spec-linter --all-files
+```
+
+Флаг `--no-warn-extras` подавляет WARNINGS при массовом прогоне.
 
 ---
 
-## 6. Как устроено сопоставление feature -> module
+## 6. Сопоставление feature → module
 
 В `lint_repo_specs.py`:
-- если в YAML есть `feature`, используется он;
-- иначе используется имя файла без `.yaml`.
 
-Пример:
-- файл `specs/user.yaml` + `feature: user` -> `openvair/modules/user`;
-- файл `specs/user.yaml` без `feature` -> тоже `openvair/modules/user`.
+| Условие | Каталог модуля |
+|---------|----------------|
+| В контракте есть `feature: user` | `openvair/modules/user` |
+| Поля `feature` нет, файл `user.md` | `openvair/modules/user` |
 
 ---
 
-## 7. Все типовые ошибки и что они означают
+## 7. Структура пакета
 
-Ниже реальные паттерны сообщений из Comparator/CLI.
+| Путь | Назначение |
+|------|------------|
+| `spec_document.py` | Блок `rde`, `load_spec`, нормализация |
+| `ast_specs.py` | Слои, `build_code_artifacts`, `load_module_sources` |
+| `http_routes.py` | Извлечение маршрутов FastAPI |
+| `comparator.py` | `Comparator`, `CompareResult` |
+| `analyzer.py` | `AstAnalyzer` |
+| `cli.py` | `run_on_openvair_module`, `main` |
+| `rde_linter.py` | Точка входа CLI одного модуля |
+| `lint_repo_specs.py` | Прогон всех `specs/*.md` |
+| `generate_openvair_specs.py` | Черновик `specs/<feature>.md` из кода |
 
-### 7.1 `Layer '<name>' not found under scanned sources ...`
+---
 
-Причина:
-- в слое нет подходящих `.py` после фильтрации;
-- или слой называется не как ожидает линтер.
+## 8. Типовые ошибки
 
-Что делать:
-- проверить структуру каталогов модуля;
-- проверить, что слой существует и файлы лежат в нем;
-- проверить имя слоя в YAML.
+### 8.1 `Layer '<name>' not found under scanned sources ...`
 
-### 7.2 `class <Name> not found in code artifacts`
+Нет подходящих `.py` в слое или неверное имя слоя. Проверьте каталоги и YAML.
 
-Причина:
-- класс с таким именем не найден в указанном слое.
+### 8.2 `class <Name> not found in code artifacts`
 
-Что делать:
-- исправить имя в YAML или коде;
-- убедиться, что класс в правильном слое.
+Класс не найден в указанном слое — имя или слой в контракте.
 
-### 7.3 `Class <Name> does not contain expected method <method>`
+### 8.3 `Class <Name> does not contain expected method <method>`
 
-Причина:
-- у класса нет такого публичного метода.
+Нет публичного метода с таким именем.
 
-Что делать:
-- добавить метод;
-- или скорректировать спецификацию под фактическое имя.
+### 8.4 `File '...' does not expose expected top-level callable ...`
 
-### 7.4 `File '<relative_path>' does not expose expected top-level callable ...`
+Нет top-level функции; возможно, это метод класса.
 
-Причина:
-- в указанном файле нет top-level функции с этим именем;
-- функция может быть методом класса, а не top-level.
+### 8.5 `Module file '...' was not scanned for functions ...`
 
-Что делать:
-- сверить путь и имя;
-- при необходимости вынести/добавить top-level функцию.
+Файл отсутствует или путь не в распознанном слое.
 
-### 7.5 `Module file '<relative_path>' was not scanned for functions ...`
+### 8.6 `No matching HTTP route in code for ...`
 
-Причина:
-- файл отсутствует;
-- путь не попал в анализ (например, слой не распознан).
+Не совпали method/path/handler или роут не извлечён статически.
 
-Что делать:
-- проверить физический путь;
-- проверить первый сегмент пути относительно layer rules.
+### 8.7 `parameter contract mismatch`
 
-### 7.6 `No matching HTTP route in code for ...`
+Расхождение `(name, kind, required, type_hint)` — выровняйте spec с сигнатурой handler.
 
-Причина:
-- не совпали method/path/handler;
-- или роут не извлекся AST-анализатором (например, динамический декоратор).
+### 8.8 Ошибки структуры HTTP в spec
 
-Что делать:
-- сделать literal-декоратор `@router.get("/path")`;
-- проверить `APIRouter(prefix="...")` literal;
-- синхронизировать handler name.
+- `required_http_endpoints must be a list`
+- `required_http_endpoints entry must be a mapping`
+- `HTTP endpoint spec must include non-empty method, path, handler`
 
-### 7.7 `parameter contract mismatch`
+### 8.9 Зарезервированное имя класса
 
-Причина:
-- endpoint найден, но отличаются параметры
-  (`name/kind/required/type_hint`).
+`Spec layer=... uses disallowed class name '$module_functions$' ...`
 
-Что делать:
-- взять фактическую сигнатуру endpoint из кода;
-- выровнять YAML один-в-один.
+### 8.10 Отсутствует каталог модуля
 
-### 7.8 `required_http_endpoints must be a list`
-
-Причина:
-- в YAML это не список.
-
-Что делать:
-- исправить структуру YAML.
-
-### 7.9 `required_http_endpoints entry must be a mapping`
-
-Причина:
-- один элемент списка endpoints не является объектом `{...}`.
-
-### 7.10
-`HTTP endpoint spec must include non-empty method, path, handler`
-
-Причина:
-- пропущено одно из обязательных полей.
-
-### 7.11
-`Spec layer='<layer>' uses disallowed class name '$module_functions$' ...`
-
-Причина:
-- использовано зарезервированное служебное имя класса.
-
-Что делать:
-- переименовать класс в YAML.
-
-### 7.12
 `skip — bounded context directory missing (openvair/modules/<feature>)`
 
-Причина:
-- для спецификации отсутствует каталог модуля.
+### 8.11 WARNINGS (не блокируют)
+
+Пример: `undocumented` — метод или сущность в коде не перечислены в контракте. Сузьте контракт или добавьте сущность в spec.
 
 ---
 
-## 8. Ограничения линтера (важно)
+## 9. Ограничения извлечения HTTP (MVP)
 
-Линтер FastAPI extraction поддерживает в MVP:
-- `router = APIRouter(prefix="...")` с literal prefix;
-- `@router.get/post/put/patch/delete("...")` с literal path;
+**Поддерживается:**
+
+- `router = APIRouter(prefix="...")` с литеральным prefix;
+- `@router.get|post|put|patch|delete("...")` с литеральным path;
 - top-level handlers.
 
-Не поддерживается (или работает нестабильно):
-- динамические пути/префиксы;
-- обертки-декораторы вокруг route;
+**Не поддерживается:**
+
+- динамические path/prefix;
+- обёртки вокруг декораторов;
 - `include_router(...)` как источник контракта;
-- сложная метапрограммная генерация endpoint-ов.
+- метапрограммная генерация маршрутов.
 
 ---
 
-## 9. Рекомендуемый рабочий процесс
+## 10. Рекомендуемый рабочий процесс
 
-1. Сгенерировать черновик спецификации:
+1. Сгенерировать черновик:
 
 ```bash
 python requirements_linter/generate_openvair_specs.py --feature my_feature
 ```
 
-2. Упростить YAML до публичного контракта.
-3. Прогнать проверку конкретного модуля:
+2. Оставить в `specs/my_feature.md` только публичный контракт.
+3. Проверить один модуль:
 
 ```bash
-python requirements_linter/rde_linter.py specs/my_feature.yaml openvair/modules/my_feature
+python requirements_linter/rde_linter.py specs/my_feature.md openvair/modules/my_feature
 ```
 
-4. Исправить mismatch.
-5. Выполнить проверку всех спецификаций:
-
-```bash
-python requirements_linter/lint_repo_specs.py
-```
-
-6. Перед коммитом проверить pre-commit hook.
+4. Исправить ошибки spec → code; при необходимости дополнить контракт по WARNINGS.
+5. Прогнать все спеки: `python requirements_linter/lint_repo_specs.py`.
+6. Перед коммитом — pre-commit.
 
 ---
 
-## 10. Быстрый FAQ
+## 11. FAQ
 
-### "Почему линтер показывает mismatch, хотя endpoint есть?"
+**Почему mismatch при видимом endpoint?**
 
-Скорее всего:
-- не совпадает handler name;
-- отличается `type_hint`;
-- `kind` определился иначе (`query` vs `body`);
-- path/prefix собрался иначе (слэши, prefix).
+Часто: другой handler, `type_hint`, `kind` (query vs body), нормализация prefix/path.
 
-### "Почему линтер ничего не нашел в слое?"
+**Почему слой пустой?**
 
-Проверь:
-- правильность директории слоя;
-- что файл `.py`;
-- что сущности публичные;
-- что анализатор действительно сканирует эту папку.
+Проверьте `.py` в каталоге слоя, публичные имена, что первый сегмент пути — имя слоя.
 
-### "Какой наиболее безопасный способ обновить спецификацию после рефакторинга?"
+**Как обновить spec после рефакторинга?**
 
-Сначала автогенерация, затем ручная чистка контракта.
+Автогенерация → ручная чистка → точечная проверка модуля.
 
 ---
 
-## 11. Команды-шпаргалка
+## 12. Команды — шпаргалка
 
 ```bash
-# 1) Один модуль
-python requirements_linter/rde_linter.py specs/user.yaml openvair/modules/user
+# Один модуль
+python requirements_linter/rde_linter.py specs/user.md openvair/modules/user
 
-# 2) Все спецификации
+# Без предупреждений о «лишнем» коде
+python requirements_linter/rde_linter.py specs/user.md openvair/modules/user --no-warn-extras
+
+# Все спецификации
 python requirements_linter/lint_repo_specs.py
 
-# 3) Генерация черновика
+# Генерация черновика .md
 python requirements_linter/generate_openvair_specs.py --feature user
 
-# 4) Тесты линтера
+# Тесты линтера
 python -m pytest requirements_linter/tests -v --override-ini addopts=
 ```
+
+---
+
+См. также краткий обзор: [README.md](README.md).

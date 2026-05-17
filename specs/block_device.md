@@ -1,3 +1,11 @@
+# Open vAIR contract: block_device
+
+Архитектурный контракт модуля `block_device` для RDE-линтера.
+Источник кода: `openvair/modules/block_device`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/block_device
 feature: block_device
@@ -168,3 +176,4 @@ layers:
       methods: []
     - name: ISCSILogoutException
       methods: []
+```

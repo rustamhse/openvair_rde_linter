@@ -1,3 +1,11 @@
+# Open vAIR contract: backup
+
+Архитектурный контракт модуля `backup` для RDE-линтера.
+Источник кода: `openvair/modules/backup`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/backup
 feature: backup
@@ -147,3 +155,4 @@ layers:
       methods: []
     - name: WrongBackuperTypeError
       methods: []
+```

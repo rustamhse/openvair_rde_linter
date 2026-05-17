@@ -1,3 +1,11 @@
+# Open vAIR contract: scheduler
+
+Архитектурный контракт модуля `scheduler` для RDE-линтера.
+Источник кода: `openvair/modules/scheduler`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/scheduler
 feature: scheduler
@@ -180,3 +188,4 @@ layers:
       methods: []
     - name: JobExecutionError
       methods: []
+```

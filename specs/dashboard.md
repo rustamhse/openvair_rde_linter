@@ -1,3 +1,11 @@
+# Open vAIR contract: dashboard
+
+Архитектурный контракт модуля `dashboard` для RDE-линтера.
+Источник кода: `openvair/modules/dashboard`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/dashboard
 feature: dashboard
@@ -50,3 +58,4 @@ layers:
       - get_data
     - name: PrometheusUnitOfWork
       methods: []
+```

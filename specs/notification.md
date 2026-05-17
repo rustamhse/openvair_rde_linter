@@ -1,3 +1,11 @@
+# Open vAIR contract: notification
+
+Архитектурный контракт модуля `notification` для RDE-линтера.
+Источник кода: `openvair/modules/notification`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/notification
 feature: notification
@@ -74,3 +82,4 @@ layers:
       methods: []
     - name: NotificationStatus
       methods: []
+```

@@ -28,9 +28,9 @@ layers:
 """
     )
     arts = AstAnalyzer(SOURCES_OK).extract()
-    errs = Comparator(reqs, arts).compare()
-    assert len(errs) == 1
-    assert 'MissingClass not found in code artifacts' in errs[0]
+    result = Comparator(reqs, arts).compare()
+    assert len(result.errors) == 1
+    assert 'MissingClass not found in code artifacts' in result.errors[0]
 
 
 def test_missing_method_error() -> None:
@@ -46,9 +46,9 @@ layers:
 """
     )
     arts = AstAnalyzer(SOURCES_OK).extract()
-    errs = Comparator(reqs, arts).compare()
-    assert len(errs) == 1
-    assert 'phantom_method' in errs[0]
+    result = Comparator(reqs, arts).compare()
+    assert len(result.errors) == 1
+    assert 'phantom_method' in result.errors[0]
 
 
 def test_sentinel_class_name_rejected() -> None:
@@ -63,9 +63,9 @@ layers:
 """
     )
     arts = AstAnalyzer(SOURCES_OK).extract()
-    errs = Comparator(reqs, arts).compare()
-    assert len(errs) == 1
-    assert 'disallowed class name' in errs[0]
+    result = Comparator(reqs, arts).compare()
+    assert len(result.errors) == 1
+    assert 'disallowed class name' in result.errors[0]
 
 
 def test_missing_module_functions_file_error() -> None:
@@ -83,9 +83,9 @@ layers:
     )
     snippet = {'entrypoints/api.py': 'async def bar():\n    pass\n'}
     arts = AstAnalyzer(snippet).extract()
-    errs = Comparator(reqs, arts).compare()
-    assert len(errs) == 1
-    assert 'ghost.py' in errs[0]
+    result = Comparator(reqs, arts).compare()
+    assert len(result.errors) == 1
+    assert 'ghost.py' in result.errors[0]
 
 
 def test_missing_top_level_callable_error() -> None:
@@ -103,6 +103,56 @@ layers:
     )
     snippet = {'entrypoints/api.py': 'async def real_handler():\n    pass\n'}
     arts = AstAnalyzer(snippet).extract()
-    errs = Comparator(reqs, arts).compare()
-    assert len(errs) == 1
-    assert 'expected_fn_missing' in errs[0]
+    result = Comparator(reqs, arts).compare()
+    assert len(result.errors) == 1
+    assert 'expected_fn_missing' in result.errors[0]
+
+
+def test_extra_method_warning_when_class_listed() -> None:
+    """Extra methods on a contracted class are reported as warnings."""
+    snippet = {
+        'domain/models.py': '''
+class UserDomainModel:
+    def validate(self): ...
+    def undocumented(self): ...
+''',
+    }
+    reqs = yaml.safe_load(
+        """
+layers:
+  domain:
+    required_classes:
+      - name: UserDomainModel
+        methods:
+          - validate
+"""
+    )
+    arts = AstAnalyzer(snippet).extract()
+    result = Comparator(reqs, arts).compare(report_extras=True)
+    assert result.errors == []
+    assert len(result.warnings) == 1
+    assert 'undocumented' in result.warnings[0]
+
+
+def test_extra_method_suppressed() -> None:
+    """``report_extras=False`` skips code-not-in-contract warnings."""
+    snippet = {
+        'domain/models.py': '''
+class UserDomainModel:
+    def validate(self): ...
+    def undocumented(self): ...
+''',
+    }
+    reqs = yaml.safe_load(
+        """
+layers:
+  domain:
+    required_classes:
+      - name: UserDomainModel
+        methods:
+          - validate
+"""
+    )
+    arts = AstAnalyzer(snippet).extract()
+    result = Comparator(reqs, arts).compare(report_extras=False)
+    assert result.warnings == []

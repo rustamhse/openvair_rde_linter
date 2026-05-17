@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import NamedTuple, cast
 
 from requirements_linter.ast_specs import (
     HTTP_ENDPOINTS_BUCKET,
@@ -14,6 +14,13 @@ _SENTINEL_CLASS_NAMES = frozenset({
     MODULE_FUNCTIONS_BUCKET,
     HTTP_ENDPOINTS_BUCKET,
 })
+
+
+class CompareResult(NamedTuple):
+    """Linter outcome: blocking errors and optional non-blocking warnings."""
+
+    errors: list[str]
+    warnings: list[str]
 
 
 def _freeze_http_parameter_rows(
@@ -228,6 +235,151 @@ def _compare_required_http_endpoints(
         )
 
 
+def _spec_class_methods_map(layer_data: dict) -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for req_class in layer_data.get('required_classes', []) or []:
+        if not isinstance(req_class, dict):
+            continue
+        name = str(req_class.get('name', ''))
+        if not name:
+            continue
+        methods_raw = req_class.get('methods', [])
+        methods = (
+            {str(m) for m in methods_raw}
+            if isinstance(methods_raw, list)
+            else set()
+        )
+        out[name] = methods
+    return out
+
+
+def _spec_module_functions_map(layer_data: dict) -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for mf in layer_data.get('required_module_functions', []) or []:
+        if not isinstance(mf, dict):
+            continue
+        rel_key = normalize_rel_path(str(mf.get('relative_path', '')))
+        fns_raw = mf.get('functions', [])
+        fns = {str(f) for f in fns_raw} if isinstance(fns_raw, list) else set()
+        out[rel_key] = fns
+    return out
+
+
+def _spec_http_triples(layer_data: dict) -> set[tuple[str, str, str]]:
+    eps_raw = layer_data.get('required_http_endpoints', [])
+    if not isinstance(eps_raw, list):
+        return set()
+    trips: set[tuple[str, str, str]] = set()
+    for spec_ep in eps_raw:
+        if isinstance(spec_ep, dict):
+            trips.add(_http_endpoint_triple(spec_ep))
+    return trips
+
+
+def _code_class_names(layer_bucket: dict[str, object]) -> set[str]:
+    return {
+        str(k)
+        for k in layer_bucket
+        if k not in _SENTINEL_CLASS_NAMES
+    }
+
+
+def _code_methods_for_class(
+    layer_bucket: dict[str, object],
+    class_name: str,
+) -> set[str]:
+    raw = layer_bucket.get(class_name)
+    if not isinstance(raw, list):
+        return set()
+    return {str(m) for m in raw}
+
+
+def collect_extras_warnings(
+    requirements: dict,
+    code_artifacts: dict,
+) -> list[str]:
+    """Report public code symbols absent from the contract (non-blocking)."""
+    warnings: list[str] = []
+    layers_req_raw = requirements.get('layers', {})
+    layers_req = layers_req_raw if isinstance(layers_req_raw, dict) else {}
+
+    for layer_name in sorted(code_artifacts.keys()):
+        layer_bucket = code_artifacts[layer_name]
+        layer_req = layers_req.get(layer_name)
+        if not isinstance(layer_req, dict):
+            layer_req = {}
+
+        spec_classes = _spec_class_methods_map(layer_req)
+        code_classes = _code_class_names(layer_bucket)
+
+        if layer_name not in layers_req:
+            for class_name in sorted(code_classes):
+                warnings.append(
+                    f'Layer: {layer_name}\n'
+                    f' Class {class_name!r} is present in code but the layer '
+                    f'is not listed in the contract.'
+                )
+            spec_mf: dict[str, set[str]] = {}
+            spec_triples: set[tuple[str, str, str]] = set()
+        else:
+            for class_name in sorted(code_classes - set(spec_classes.keys())):
+                warnings.append(
+                    f'Layer: {layer_name}\n'
+                    f' Class {class_name!r} is present in code but not listed '
+                    f'in required_classes.'
+                )
+            spec_mf = _spec_module_functions_map(layer_req)
+            spec_triples = _spec_http_triples(layer_req)
+
+        for class_name in sorted(code_classes & set(spec_classes.keys())):
+            extra_methods = _code_methods_for_class(
+                layer_bucket,
+                class_name,
+            ) - spec_classes[class_name]
+            for method_name in sorted(extra_methods):
+                warnings.append(
+                    f'Layer: {layer_name}\n'
+                    f' Class {class_name} exposes method {method_name!r} in '
+                    f'code but it is not listed in the contract.'
+                )
+
+        code_mf = _mf_actual_map(layer_bucket)
+        for rel_path in sorted(set(code_mf.keys()) - set(spec_mf.keys())):
+            warnings.append(
+                f'Layer: {layer_name}\n'
+                f' File {rel_path!r} exposes top-level callables in code '
+                f'but is not listed in required_module_functions.'
+            )
+        for rel_path in sorted(set(code_mf.keys()) & set(spec_mf.keys())):
+            extra_fns = set(code_mf[rel_path]) - spec_mf[rel_path]
+            for fn_name in sorted(extra_fns):
+                warnings.append(
+                    f'Layer: {layer_name}\n'
+                    f' File {rel_path!r} exposes callable {fn_name!r} in code '
+                    f'but it is not listed in the contract.'
+                )
+
+        http_actual_raw = layer_bucket.get(HTTP_ENDPOINTS_BUCKET, [])
+        code_eps_list = (
+            http_actual_raw if isinstance(http_actual_raw, list) else []
+        )
+        for code_ep in code_eps_list:
+            if not isinstance(code_ep, dict):
+                continue
+            trip = _http_endpoint_triple(code_ep)
+            if trip[0] == '' or trip[1] == '' or trip[2] == '':
+                continue
+            if trip not in spec_triples:
+                warnings.append(
+                    f'Layer: {layer_name}\n'
+                    f' HTTP route {trip[0]} {trip[1]!r} handler={trip[2]!r} '
+                    f'is present in code but not listed in '
+                    f'required_http_endpoints.'
+                )
+
+    return warnings
+
+
 class Comparator:
     """Compare a YAML layered contract with scanned artifacts."""
 
@@ -237,8 +389,8 @@ class Comparator:
         self.code_artifacts = code_artifacts
         self.errors: list[str] = []
 
-    def compare(self) -> list[str]:
-        """Return mismatch messages across all configured layers."""
+    def compare(self, *, report_extras: bool = True) -> CompareResult:
+        """Return blocking mismatches and optional code-not-in-spec warnings."""
         layers_req = self.requirements.get('layers', {})
         for layer_name, layer_data in layers_req.items():
             if layer_name not in self.code_artifacts:
@@ -271,4 +423,10 @@ class Comparator:
                     yaml_eps,
                 )
 
-        return self.errors
+        warnings: list[str] = []
+        if report_extras:
+            warnings = collect_extras_warnings(
+                self.requirements,
+                self.code_artifacts,
+            )
+        return CompareResult(errors=self.errors, warnings=warnings)

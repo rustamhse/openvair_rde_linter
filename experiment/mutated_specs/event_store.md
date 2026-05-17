@@ -1,3 +1,11 @@
+# Open vAIR contract (mutated benchmark): event_store
+
+Архитектурный контракт модуля `event_store` для RDE-линтера.
+Источник кода: `openvair/modules/event_store`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/event_store
 feature: event_store
@@ -24,6 +32,21 @@ layers:
       - get_last_events
     - name: Events
       methods: []
+    - name: PhantomRde_event_store_adapters_1
+      methods:
+      - run
+    - name: PhantomRde_event_store_adapters_2
+      methods:
+      - run
+    - name: PhantomRde_event_store_adapters_3
+      methods:
+      - run
+    - name: PhantomRde_event_store_adapters_4
+      methods:
+      - run
+    - name: PhantomRde_event_store_adapters_5
+      methods:
+      - run
   entrypoints:
     required_classes:
     - name: CSVResponse
@@ -71,3 +94,4 @@ layers:
       - get_all_events
       - get_all_events_by_module
       - get_last_events
+```

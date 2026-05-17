@@ -1,3 +1,11 @@
+# Open vAIR contract: image
+
+Архитектурный контракт модуля `image` для RDE-линтера.
+Источник кода: `openvair/modules/image`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/image
 feature: image
@@ -241,3 +249,4 @@ layers:
       methods: []
     - name: ValidateArgumentsError
       methods: []
+```

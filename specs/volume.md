@@ -1,3 +1,11 @@
+# Open vAIR contract: volume
+
+Архитектурный контракт модуля `volume` для RDE-линтера.
+Источник кода: `openvair/modules/volume`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/volume
 feature: volume
@@ -326,3 +334,4 @@ layers:
       methods: []
     - name: VolumeStatusException
       methods: []
+```

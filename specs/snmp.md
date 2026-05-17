@@ -1,3 +1,11 @@
+# Open vAIR contract: snmp
+
+Архитектурный контракт модуля `snmp` для RDE-линтера.
+Источник кода: `openvair/modules/snmp`.
+
+Машиночитаемый контракт — блок ``rde`` ниже.
+
+```rde
 meta:
   source: openvair/modules/snmp
 feature: snmp
@@ -47,3 +55,4 @@ layers:
     - relative_path: domain/manager.py
       functions:
       - main
+```
