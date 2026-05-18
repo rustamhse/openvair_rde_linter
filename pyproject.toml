@@ -35,6 +35,8 @@ dependencies = [
     "pydantic-settings==2.8.1",
     "pyjwt~=2.10.1",
     "python-multipart>=0.0.20",
+    "python-crontab>=3.3.0",
+    "croniter>=2.0.5",
     "requests>=2.32.5",
     "sentry-sdk==2.11.0",
     "sqlalchemy~=2.0",
@@ -56,6 +58,7 @@ dev = [
     "types-pyyaml>=6.0.12.20250915",
     "types-requests>=2.32.4.20250913",
     "types-toml==0.10.8.20240310",
+    "types-python-crontab>=3.2.0",
 ]
 
 [project.urls]
