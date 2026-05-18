@@ -174,7 +174,7 @@ layers:
       methods: []
     - name: SchedulerServiceLayerManager
       methods:
-      - get_all_jobs
+      - get_all_jobs_here_is_error
       - create_job
       - edit_job
       - delete_job
