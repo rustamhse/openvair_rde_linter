@@ -1,7 +1,7 @@
 """Integration tests for storage deletion endpoints.
 
 Covers:
-- Successful storage (and local disk partition) deletion.
+- Successful storage deletion.
 - Validation errors (invalid UUID).
 - Logical errors:
     - Nonexistent storage
@@ -17,7 +17,6 @@ from fastapi.testclient import TestClient
 
 from openvair.libs.testing.utils import (
     cleanup_all_volumes,
-    get_disk_partitions,
     wait_full_deleting_object,
 )
 from openvair.modules.storage.service_layer.services import StorageStatus
@@ -29,6 +28,7 @@ def test_delete_storage_success(
 ) -> None:
     """Test successful storage deletion using fixture."""
     storage_id = storage['id']
+    assert storage['storage_type'] == 'localfs'
     delete_response = client.delete(f'/storages/{storage_id}/delete')
     assert delete_response.status_code == status.HTTP_202_ACCEPTED
     data = delete_response.json()

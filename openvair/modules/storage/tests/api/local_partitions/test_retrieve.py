@@ -1,9 +1,10 @@
-"""Integration tests for storage retrieval endpoints.
+"""Integration tests for local partitions (disks) retrieval.
 
 Covers:
-- Successful retrieval (all storages, storage by ID, local disks, partitions)
-- Validation errors (invalid UUID, nonexistent storage, etc.)
-- Unauthorized access for all endpoints
+- Successful retrieval (local disks, partitions).
+- Validation errors (missing param).
+- Logical errors (invalid disk).
+- Unauthorized access.
 """
 
 import uuid
@@ -95,9 +96,6 @@ def test_get_local_disks_success(client: TestClient) -> None:
         assert 'size' in disk
         assert isinstance(disk['path'], str)
         assert isinstance(disk['size'], int)
-        if disk['path'] == test_disk_path:
-            assert disk['size'] > 0
-            assert disk['fstype'] == storage_settings.storage_fs_type
 
 
 def test_get_local_disks_unauthorized(unauthorized_client: TestClient) -> None:

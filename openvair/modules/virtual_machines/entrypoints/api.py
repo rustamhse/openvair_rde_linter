@@ -92,13 +92,13 @@ async def get_vms(
     dependencies=[Depends(get_current_user)],
 )
 async def get_vm(
-    vm_id: str = Path(description='VM ID'),
+    vm_id: UUID = Path(description='ID of VM to get'),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.VirtualMachineInfo:
     """Retrieve a virtual machine by ID.
 
     Args:
-        vm_id (str): The ID of the virtual machine to retrieve.
+        vm_id (UUID): The ID of the virtual machine to retrieve.
         crud (VMCrud): The CRUD dependency for virtual machine operations.
 
     Returns:
@@ -151,7 +151,7 @@ async def delete_vm(
     """Delete a virtual machine by ID.
 
     Args:
-        vm_id (str): The ID of the virtual machine to delete.
+        vm_id (UUID): The ID of the virtual machine to delete.
         user_info (Dict): The dependency to ensure the user is authenticated.
         crud (VMCrud): The CRUD dependency for virtual machine operations.
 
@@ -179,7 +179,7 @@ async def start_vm(
     """Start a virtual machine by ID.
 
     Args:
-        vm_id (str): The ID of the virtual machine to start.
+        vm_id (UUID): The ID of the virtual machine to start.
         user_info (Dict): The dependency to ensure the user is authenticated.
         crud (VMCrud): The CRUD dependency for virtual machine operations.
 
@@ -205,7 +205,7 @@ async def shut_off_vm(
     """Shut off a virtual machine by ID.
 
     Args:
-        vm_id (str): The ID of the virtual machine to shut off.
+        vm_id (UUID): The ID of the virtual machine to shut off.
         user_info (Dict): The dependency to ensure the user is authenticated.
         crud (VMCrud): The CRUD dependency for virtual machine operations.
 
@@ -226,7 +226,6 @@ async def shut_off_vm(
     status_code=status.HTTP_201_CREATED,
 )
 async def edit_vm(
-    vm_id: str,
     data: schemas.EditVm,
     user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
@@ -234,7 +233,7 @@ async def edit_vm(
     """Edit a virtual machine by ID.
 
     Args:
-        vm_id (str): The ID of the virtual machine to edit.
+        vm_id (UUID): The ID of the virtual machine to edit.
         data (schemas.EditVm): The data to update the virtual machine.
         user_info (Dict): The dependency to ensure the user is authenticated.
         crud (VMCrud): The CRUD dependency for virtual machine operations.
@@ -263,7 +262,7 @@ async def vnc_vm(
     """Access the VNC session of a virtual machine by ID.
 
     Args:
-        vm_id (str): The ID of the virtual machine.
+        vm_id (UUID): The ID of the virtual machine.
         user_info (Dict): The dependency to ensure the user is authenticated.
         crud (VMCrud): The CRUD dependency for virtual machine operations.
 
@@ -289,7 +288,7 @@ async def clone_vm(
     """Clone a virtual machine.
 
     Args:
-        vm_id (str): The ID of the virtual machine to copy.
+        vm_id (UUID): The ID of the virtual machine to copy.
         data (schemas.CloneVm): The data to clone the virtual machine.
         user_info (Dict): The dependency to ensure the user is authenticated.
         crud (VMCrud): The CRUD dependency for virtual machine operations.
@@ -335,7 +334,7 @@ async def get_snapshots(
         f'virtual machine with ID: {vm_id}.'
     )
     snapshots = await run_in_threadpool(
-        crud.get_snapshots, str(vm_id), user_info
+        crud.get_snapshots, vm_id, user_info
     )
     LOG.info('API request was successfully processed.')
     return schemas.ListOfSnapshots(snapshots=snapshots)
@@ -369,7 +368,7 @@ async def get_snapshot(
         f'of virtual machine with ID: {vm_id}.'
     )
     snapshot = await run_in_threadpool(
-        crud.get_snapshot, str(vm_id), str(snap_id), user_info
+        crud.get_snapshot, vm_id, snap_id, user_info
     )
     LOG.info('API request was successfully processed.')
     return schemas.SnapshotInfo(**snapshot)
@@ -381,7 +380,6 @@ async def get_snapshot(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_snapshot(
-    vm_id: UUID,
     data: schemas.CreateSnapshot,
     user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
@@ -405,7 +403,7 @@ async def create_snapshot(
     )
     snapshot = await run_in_threadpool(
         crud.create_snapshot,
-        str(vm_id),
+        vm_id,
         data.model_dump(mode='json'),
         user_info,
     )
@@ -441,7 +439,7 @@ async def revert_snapshot(
         f'of virtual machine with ID: {vm_id}'
     )
     snapshot = await run_in_threadpool(
-        crud.revert_snapshot, str(vm_id), str(snap_id), user_info
+        crud.revert_snapshot, vm_id, snap_id, user_info
     )
     LOG.info('API request was successfully processed.')
     return schemas.SnapshotInfo(**snapshot)
@@ -474,7 +472,7 @@ async def delete_snapshot(
         f'from virtual machine with ID: {vm_id}.'
     )
     snapshot = await run_in_threadpool(
-        crud.delete_snapshot, str(vm_id), str(snap_id), user_info
+        crud.delete_snapshot, vm_id, snap_id, user_info
     )
     LOG.info('API request was successfully processed.')
     return schemas.SnapshotInfo(**snapshot)

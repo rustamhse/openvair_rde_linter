@@ -47,6 +47,7 @@ from sqlalchemy.exc import NoResultFound
 from openvair.libs.log import get_logger
 from openvair.libs.libvirt.vm import get_vms_state, get_vm_snapshots
 from openvair.libs.clone.utils import (
+    generate_unique_macs,
     get_max_clone_number,
     create_new_clone_name,
 )
@@ -980,6 +981,12 @@ class VMServiceLayerManager(BackgroundTasks):
         with self.uow() as uow:
             db_vm = uow.virtual_machines.get_or_fail(UUID(vm_id))
             vm_name = db_vm.name
+            self._check_vm_status(
+                db_vm.status, [VmStatus.available.name, VmStatus.error.name]
+            )
+            self._check_vm_power_state(
+                db_vm.power_state, [VmPowerState.shut_off.name]
+            )
             db_vm.status = VmStatus.starting.name
             uow.commit()
         self.event_store.add_event(
@@ -1349,7 +1356,6 @@ class VMServiceLayerManager(BackgroundTasks):
             available_states = [VmStatus.available.name, VmStatus.error.name]
             available_power_states = [
                 VmPowerState.shut_off.name,
-                VmPowerState.running.name,
             ]
             try:
                 self._check_vm_status(db_vm.status, available_states)
@@ -1358,14 +1364,13 @@ class VMServiceLayerManager(BackgroundTasks):
                 )
                 vm_edit_info = self._prepare_vm_info_for_edit(edit_info)
                 db_vm.status = VmStatus.editing.name
-                if db_vm.power_state == VmPowerState.shut_off.name:
-                    self.service_layer_rpc.cast(
-                        self._edit_shut_offed_vm.__name__,
-                        data_for_method={
-                            'edit_info': vm_edit_info._asdict(),
-                            'user_info': user_info,
-                        },
-                    )
+                self.service_layer_rpc.cast(
+                    self._edit_shut_offed_vm.__name__,
+                    data_for_method={
+                        'edit_info': vm_edit_info._asdict(),
+                        'user_info': user_info,
+                    },
+                )
             except (
                 exceptions.VMStatusException,
                 exceptions.VMPowerStateException,
@@ -1374,6 +1379,7 @@ class VMServiceLayerManager(BackgroundTasks):
                 message = f'Handle error: {err!s} while editing VM.'
                 LOG.error(message)
                 db_vm.information = message
+                raise
             finally:
                 uow.commit()
         LOG.info('Response on edit VM was successfully processed.')
@@ -1523,10 +1529,10 @@ class VMServiceLayerManager(BackgroundTasks):
         disk_names = [volume['name'] for volume in volumes]
         attached_disks = [disk['name'] for disk in original_vm.get('disks', [])]
 
-        max_numbers = {}
+        max_disk_numbers = {}
         for disk in attached_disks:
-            max_number = get_max_clone_number(disk, disk_names, count)
-            max_numbers[disk] = max_number
+            max_disk_number = get_max_clone_number(disk, disk_names, count)
+            max_disk_numbers[disk] = max_disk_number
 
         vms = self.get_all_vms()
 
@@ -1535,11 +1541,32 @@ class VMServiceLayerManager(BackgroundTasks):
             original_vm['name'], vm_names, count
         )
 
+        with self.uow() as uow:
+            db_vms = uow.virtual_machines.get_all()
+            existing_macs = {
+                interface.mac
+                for db_vm in db_vms
+                for interface in db_vm.virtual_interfaces
+                if interface.mac
+            }
+        interfaces_per_vm = len(original_vm.get('virtual_interfaces', []))
+        total_macs_num = count * interfaces_per_vm
+        unique_macs = generate_unique_macs(existing_macs, total_macs_num)
+
         # Create *count* of clones
         for i in range(count):
             # 1. Build minimal create_VM payload
+            start_idx = i * interfaces_per_vm
+            end_idx = start_idx + interfaces_per_vm
+            clone_macs = unique_macs[start_idx:end_idx]
+
             clone_payload = self._transform_clone_vm_data(
-                original_vm, user_info, target_storage_id, max_numbers, i
+                original_vm,
+                user_info,
+                target_storage_id,
+                max_disk_numbers,
+                clone_macs,
+                i,
             )
 
             clone_payload['name'] = create_new_clone_name(
@@ -1570,7 +1597,7 @@ class VMServiceLayerManager(BackgroundTasks):
 
         return result
 
-    def _transform_clone_vm_data(  # noqa: C901 # TODO: refactor using DTO
+    def _transform_clone_vm_data(  # noqa: C901, PLR0913 # TODO: refactor using DTO and reduce parameters
         self,
         vm: dict,
         user_info: dict,
@@ -1589,14 +1616,12 @@ class VMServiceLayerManager(BackgroundTasks):
             user_info (Dict): User information to be included in the new VM.
             target_storage_id (UUID): ID of storage where the volume will be
                 created
-            max_numbers (Dict): Dictionary of disk names and max suffix number
-            for each disk
+            max_disk_numbers (Dict): Dictionary of disk names and max suffix
+            number for each disk.
+            clone_macs (List[str]): Pre-generated MAC addresses for this clone.
             current_copy (int): current copy number
         Returns:
             Dict: The transformed VM data ready for cloning.
-            This function prepares the VM data for cloning by removing
-            unnecessary fields and ensuring the data structure is compatible
-            with the expected input for creating a new VM.
         """
         try:
             data = deepcopy(vm)
@@ -1618,7 +1643,7 @@ class VMServiceLayerManager(BackgroundTasks):
                         'mode': vif['mode'],
                         'portgroup': vif.get('portgroup'),
                         'interface': vif['interface'],
-                        'mac': vif['mac'],  # TODO: generate unique MAC
+                        'mac': mac_address,
                         'model': vif['model'],
                         'order': vif.get('order', 0),
                     }
@@ -1628,7 +1653,7 @@ class VMServiceLayerManager(BackgroundTasks):
             attach_disks: list[dict] = self._vm_clone_disks_payload(
                 data.get('disks', []),
                 user_info,
-                max_numbers,
+                max_disk_numbers,
                 target_storage_id,
                 current_copy,
             )
@@ -2224,7 +2249,9 @@ class VMServiceLayerManager(BackgroundTasks):
         Args:
             db_vm: VirtualMachines database object to update snapshots for.
         """
-        libvirt_snaps, libvirt_current_snap = get_vm_snapshots(db_vm.name)
+        snapshots_info = get_vm_snapshots(db_vm.name)
+        libvirt_snaps = snapshots_info['snapshots']
+        libvirt_current_snap = snapshots_info['current_snapshot']
         vm_id = str(db_vm.id)
         with self.uow() as uow:
             db_snaps = uow.snapshots.get_all_by_vm(vm_id)

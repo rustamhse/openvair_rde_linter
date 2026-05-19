@@ -59,7 +59,7 @@ class Cpu(BaseModel):
 class RAM(BaseModel):
     """Schema for RAM information."""
 
-    size: int
+    size: int = Field(..., gt=0, description="RAM size (> 0)")
 
 
 class Os(BaseModel):
@@ -258,7 +258,9 @@ class EditVirtualInterfaces(BaseModel):
 class EditVm(BaseModel):
     """Schema for editing a virtual machine."""
 
-    name: str
+    name: str = Field(
+        ..., min_length=1, max_length=60, description="VM name (1-60)"
+    )
     description: str
     cpu: Cpu
     ram: RAM
@@ -271,7 +273,7 @@ class EditVm(BaseModel):
 class CloneVm(BaseModel):
     """Schema for cloning a virtual machine."""
 
-    count: int = Field(1, description='Number of clones')
+    count: int = Field(1, ge=1, le=999, description='Number of clones (1-999)')
     target_storage_id: UUID = Field(
         ..., description='ID of storage where the volume will be created'
     )
