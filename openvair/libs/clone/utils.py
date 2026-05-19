@@ -8,8 +8,6 @@ Functions:
 """
 
 import re
-import secrets
-from typing import Set, List, Optional
 
 from openvair.libs.log import get_logger
 from openvair.libs.clone.exceptions import (
@@ -22,7 +20,7 @@ LOG = get_logger(__name__)
 
 
 def get_max_clone_number(
-    base_name: str, existing_names: List[str], count: int
+    base_name: str, existing_names: list[str], count: int
 ) -> int:
     """Gets max clone suffix number matching '<base_name>_clone_<NNN>'.
 
@@ -55,7 +53,7 @@ def get_max_clone_number(
 
 
 def create_new_clone_name(
-    name: str, num: int, max_len: Optional[int] = None
+    name: str, num: int, max_len: int | None = None
 ) -> str:
     """Creates a name of a clone.
 

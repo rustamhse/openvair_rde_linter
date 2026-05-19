@@ -40,7 +40,7 @@ Endpoints:
 """
 
 from uuid import UUID
-from typing import Dict, List, cast
+from typing import cast
 
 from fastapi import Path, Depends, APIRouter, status
 from fastapi.responses import JSONResponse
@@ -82,7 +82,7 @@ async def get_vms(
     LOG.info('API handling request to get all virtual machines.')
     vms = await run_in_threadpool(crud.get_all_vms)
     LOG.info('API request was successfully processed.')
-    return cast(Page, paginate(vms))
+    return cast('Page', paginate(vms))
 
 
 @router.get(
@@ -117,7 +117,7 @@ async def get_vm(
 )
 async def create_vm(
     data: schemas.CreateVirtualMachine,
-    user_info: Dict = Depends(get_current_user),
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.VirtualMachineInfo:
     """Create a new virtual machine.
@@ -144,8 +144,8 @@ async def create_vm(
     status_code=status.HTTP_201_CREATED,
 )
 async def delete_vm(
-    vm_id: UUID = Path(description='ID of VM to delete'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: str,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> JSONResponse:
     """Delete a virtual machine by ID.
@@ -172,8 +172,8 @@ async def delete_vm(
     status_code=status.HTTP_201_CREATED,
 )
 async def start_vm(
-    vm_id: UUID = Path(description='ID of VM to start'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: str,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.VirtualMachineInfo:
     """Start a virtual machine by ID.
@@ -198,8 +198,8 @@ async def start_vm(
     status_code=status.HTTP_201_CREATED,
 )
 async def shut_off_vm(
-    vm_id: UUID = Path(description='ID of VM to shut off'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: str,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.VirtualMachineInfo:
     """Shut off a virtual machine by ID.
@@ -227,8 +227,7 @@ async def shut_off_vm(
 )
 async def edit_vm(
     data: schemas.EditVm,
-    vm_id: UUID = Path(description='ID of VM to edit'),
-    user_info: Dict = Depends(get_current_user),
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.VirtualMachineInfo:
     """Edit a virtual machine by ID.
@@ -256,8 +255,8 @@ async def edit_vm(
     status_code=status.HTTP_200_OK,
 )
 async def vnc_vm(
-    vm_id: UUID = Path(description='ID of VM to access VNC session'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: str,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.Vnc:
     """Access the VNC session of a virtual machine by ID.
@@ -276,16 +275,16 @@ async def vnc_vm(
 
 @router.post(
     '/{vm_id}/clone/',
-    response_model=List[schemas.VirtualMachineInfo],
+    response_model=list[schemas.VirtualMachineInfo],
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(get_current_user)],
 )
 async def clone_vm(
     data: schemas.CloneVm,
-    vm_id: UUID = Path(description='ID of VM to clone'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: str = Path(description='Id of vm that will be cloned'),
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
-) -> List[schemas.VirtualMachineInfo]:
+) -> list[schemas.VirtualMachineInfo]:
     """Clone a virtual machine.
 
     Args:
@@ -301,7 +300,7 @@ async def clone_vm(
         f'API handling request to copy data for VM with ID: {vm_id} '
         f'{data.count} times.'
     )
-    result: List[Dict] = await run_in_threadpool(
+    result: list[dict] = await run_in_threadpool(
         crud.clone_vm, vm_id, data.count, data.target_storage_id, user_info
     )
     LOG.info('API request was successfully processed.')
@@ -315,8 +314,8 @@ async def clone_vm(
     dependencies=[Depends(get_current_user)],
 )
 async def get_snapshots(
-    vm_id: UUID = Path(description='ID of VM to get snapshots'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: UUID,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.ListOfSnapshots:
     """Retrieve all snapshots of the specific virtual machine.
@@ -348,9 +347,9 @@ async def get_snapshots(
     dependencies=[Depends(get_current_user)],
 )
 async def get_snapshot(
-    vm_id: UUID = Path(description='ID of VM to get snapshot'),
-    snap_id: UUID = Path(description='ID of snapshot to get'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: UUID,
+    snap_id: UUID,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.SnapshotInfo:
     """Retrieve a snapshot of a specific virtual machine by snapshot ID.
@@ -382,8 +381,7 @@ async def get_snapshot(
 )
 async def create_snapshot(
     data: schemas.CreateSnapshot,
-    vm_id: UUID = Path(description='ID of VM to create snapshot'),
-    user_info: Dict = Depends(get_current_user),
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.SnapshotInfo:
     """Create a new snapshot of the virtual machine.
@@ -419,9 +417,9 @@ async def create_snapshot(
     status_code=status.HTTP_200_OK,
 )
 async def revert_snapshot(
-    vm_id: UUID = Path(description='ID of VM to revert snapshot'),
-    snap_id: UUID = Path(description='ID of snapshot to revert'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: UUID,
+    snap_id: UUID,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.SnapshotInfo:
     """Revert a virtual machine to a snapshot.
@@ -452,9 +450,9 @@ async def revert_snapshot(
     status_code=status.HTTP_200_OK,
 )
 async def delete_snapshot(
-    vm_id: UUID = Path(description='ID of VM to delete snapshot'),
-    snap_id: UUID = Path(description='ID of snapshot to delete'),
-    user_info: Dict = Depends(get_current_user),
+    vm_id: UUID,
+    snap_id: UUID,
+    user_info: dict = Depends(get_current_user),
     crud: VMCrud = Depends(VMCrud),
 ) -> schemas.SnapshotInfo:
     """Delete a snapshot of virtual machine.

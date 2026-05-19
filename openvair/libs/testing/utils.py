@@ -12,7 +12,7 @@ functions for:
 
 import time
 import uuid
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 from pathlib import Path
 
 import libvirt
@@ -66,8 +66,8 @@ LOG = get_logger(__name__)
 
 
 def create_resource(
-    client: TestClient, endpoint: str, payload: Dict, resource_name: str
-) -> Dict[str, Any]:
+    client: TestClient, endpoint: str, payload: dict, resource_name: str
+) -> dict[str, Any]:
     """Creates a resource on a specified endpoint using the provided client and payload.
 
     This function sends a POST request to create a resource at the specified endpoint using the
@@ -100,7 +100,7 @@ def create_resource(
             f'{response.text}'
         )
         raise RuntimeError(msg)
-    return cast(Dict[str, Any], response.json())
+    return cast('dict[str, Any]', response.json())
 
 
 def delete_resource(
@@ -274,7 +274,7 @@ def cleanup_all_storages() -> None:
                 uow.commit()
 
 
-def get_disk_partitions(disk_path: str) -> List[str]:
+def get_disk_partitions(disk_path: str) -> list[str]:
     """Returns a list of partition numbers on the given disk.
 
     Args:
@@ -299,7 +299,7 @@ def get_disk_partitions(disk_path: str) -> List[str]:
 
 
 def cleanup_partitions(
-        disk_path: str, partition_numbers: List[str]
+        disk_path: str, partition_numbers: list[str]
 ) -> None:
     """Deletes a list of partitions from a disk.
 
@@ -384,7 +384,7 @@ def wait_for_field_value(  # noqa: PLR0913
             raw = response.json()
             data = (
                 raw['data']
-                if 'data' in raw and isinstance(raw['data'], Dict)
+                if 'data' in raw and isinstance(raw['data'], dict)
                 else raw
             )
             if data.get(field) == expected:
@@ -415,7 +415,7 @@ def wait_for_field_not_empty(
             raw = response.json()
             data = (
                 raw['data']
-                if 'data' in raw and isinstance(raw['data'], Dict)
+                if 'data' in raw and isinstance(raw['data'], dict)
                 else raw
             )
             if field in data:
@@ -488,7 +488,7 @@ def wait_full_deleting_object(
             raw = response.json()
             data = (
                 raw['data']
-                if 'data' in raw and isinstance(raw['data'], Dict)
+                if 'data' in raw and isinstance(raw['data'], dict)
                 else raw
             )
             if data.get(object_id) is None:
@@ -528,9 +528,9 @@ def wait_full_deleting_file(
     raise TimeoutError(message)
 
 
-def _extract_data_field(response_json: Dict) -> Dict:
+def _extract_data_field(response_json: dict) -> dict:
     """Returns response['data'] if it's a BaseResponse, else root object."""
-    if 'data' in response_json and isinstance(response_json['data'], Dict):
+    if 'data' in response_json and isinstance(response_json['data'], dict):
         return response_json['data']
     return response_json
 
@@ -577,7 +577,7 @@ def cleanup_test_bridges() -> None:  # noqa: C901 because it will be simplified 
                 with unit_of_work as uow:
                     db_bridge = uow.interfaces.get_by_name(bridge_name)
                     if db_bridge:
-                        bridge_data: Dict = {
+                        bridge_data: dict = {
                             'id': str(db_bridge.id),
                             'name': db_bridge.name,
                             'type': 'bridge',

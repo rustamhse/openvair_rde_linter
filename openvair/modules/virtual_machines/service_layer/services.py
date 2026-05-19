@@ -39,10 +39,9 @@ import time
 import string
 from copy import deepcopy
 from uuid import UUID, uuid4
-from typing import Set, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, cast
 from collections import namedtuple
 
-from sqlalchemy import String
 from sqlalchemy.exc import NoResultFound
 
 from openvair.libs.log import get_logger
@@ -75,6 +74,9 @@ from openvair.libs.messaging.clients.rpc_clients.image_rpc_client import (
 from openvair.libs.messaging.clients.rpc_clients.volume_rpc_client import (
     VolumeServiceLayerRPCClient,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy import String
 
 LOG = get_logger(__name__)
 
@@ -196,7 +198,7 @@ class VMServiceLayerManager(BackgroundTasks):
         virtual machines, including the unit of work, RPC clients,
         and event store.
         """
-        super(VMServiceLayerManager, self).__init__()
+        super().__init__()
         self.uow = unit_of_work.VMSqlAlchemyUnitOfWork
         self.domain_rpc = MessagingClient(
             queue_name=config.SERVICE_LAYER_DOMAIN_QUEUE_NAME
@@ -208,7 +210,7 @@ class VMServiceLayerManager(BackgroundTasks):
         self.image_service_client = ImageServiceLayerRPCClient()
         self.event_store = EventCrud('virtual_machines')
 
-    def get_vm(self, data: Dict) -> Dict:
+    def get_vm(self, data: dict) -> dict:
         """Retrieve a virtual machine by ID.
 
         Args:
@@ -237,7 +239,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Service layer method get vm was successfully processed.')
         return serialized_vm
 
-    def get_all_vms(self) -> List:
+    def get_all_vms(self) -> list:
         """Retrieve all virtual machines.
 
         Returns:
@@ -254,10 +256,10 @@ class VMServiceLayerManager(BackgroundTasks):
 
     @staticmethod
     def _process_attach_disk(
-        disk_info: Dict,
-        disk_ids: Set[str],
-        attach_volumes: List,
-        attach_images: List,
+        disk_info: dict,
+        disk_ids: set[str],
+        attach_volumes: list,
+        attach_images: list,
     ) -> None:
         """Process and validate an attached disk information.
 
@@ -287,7 +289,7 @@ class VMServiceLayerManager(BackgroundTasks):
         else:
             attach_images.append(disk_info)
 
-    def _prepare_create_vm_info(self, vm_info: Dict) -> CreateVmInfo:
+    def _prepare_create_vm_info(self, vm_info: dict) -> CreateVmInfo:
         """Prepare the information needed to create a virtual machine.
 
         Args:
@@ -316,7 +318,7 @@ class VMServiceLayerManager(BackgroundTasks):
         )
 
         disks = vm_info.pop('disks', {})
-        disk_ids: Set[str] = set()
+        disk_ids: set[str] = set()
 
         for attach_disk in disks.pop('attach_disks', []):
             disk_id = None
@@ -353,7 +355,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Vm information was successfully prepared for creating.')
         return create_vm_info
 
-    def _insert_vm_into_db(self, create_vm_info: CreateVmInfo) -> Dict:
+    def _insert_vm_into_db(self, create_vm_info: CreateVmInfo) -> dict:
         """Insert virtual machine information into the database.
 
         Args:
@@ -365,12 +367,12 @@ class VMServiceLayerManager(BackgroundTasks):
         """
         LOG.info('Inserting vm information into database.')
         db_vm = cast(
-            orm.VirtualMachines,
+            'orm.VirtualMachines',
             DataSerializer.to_db(create_vm_info._asdict(), orm.VirtualMachines),
         )
 
         db_vm.cpu = cast(
-            orm.CpuInfo,
+            'orm.CpuInfo',
             DataSerializer.to_db(
                 create_vm_info.cpu,
                 orm.CpuInfo,
@@ -378,17 +380,17 @@ class VMServiceLayerManager(BackgroundTasks):
         )
 
         db_vm.ram = cast(
-            orm.RAM,
+            'orm.RAM',
             DataSerializer.to_db(create_vm_info.ram, orm.RAM),
         )
 
         db_vm.os = cast(
-            orm.Os,
+            'orm.Os',
             DataSerializer.to_db(create_vm_info.os, orm.Os),
         )
 
         db_vm.graphic_interface = cast(
-            orm.ProtocolGraphicInterface,
+            'orm.ProtocolGraphicInterface',
             DataSerializer.to_db(
                 create_vm_info.graphic_interface,
                 orm.ProtocolGraphicInterface,
@@ -399,7 +401,7 @@ class VMServiceLayerManager(BackgroundTasks):
         for virt_interface in create_vm_info.virtual_interfaces:
             db_vm.virtual_interfaces.append(
                 cast(
-                    orm.VirtualInterface,
+                    'orm.VirtualInterface',
                     DataSerializer.to_db(virt_interface, orm.VirtualInterface),
                 )
             )
@@ -410,7 +412,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Vm was successfully inserted into database.')
         return DataSerializer.vm_to_web(db_vm)
 
-    def create_vm(self, data: Dict) -> Dict:
+    def create_vm(self, data: dict) -> dict:
         """Create a new virtual machine.
 
         Args:
@@ -420,7 +422,7 @@ class VMServiceLayerManager(BackgroundTasks):
             Dict: The serialized virtual machine data.
         """
         LOG.info('Handling call on create vm.')
-        user_info: Dict = data.get('user_info', {})
+        user_info: dict = data.get('user_info', {})
         create_vm_info = self._prepare_create_vm_info(data)
         web_vm = self._insert_vm_into_db(create_vm_info)
 
@@ -428,7 +430,7 @@ class VMServiceLayerManager(BackgroundTasks):
             str(web_vm.get('id', '')),
             str(user_info.get('id', '')),
             self.create_vm.__name__,
-            f"VM {web_vm.get('name')} was successfully inserted into DB.",
+            f'VM {web_vm.get("name")} was successfully inserted into DB.',
         )
 
         self.service_layer_rpc.cast(
@@ -444,7 +446,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Call on create vm was successfully processed.')
         return web_vm
 
-    def _expect_volume_availability(self, volume_id: str) -> Dict:
+    def _expect_volume_availability(self, volume_id: str) -> dict:
         """Wait for a volume to become available.
 
         This method repeatedly checks the availability status of a volume until
@@ -494,7 +496,7 @@ class VMServiceLayerManager(BackgroundTasks):
             LOG.error(message)
             raise exceptions.MaxTriesError(message)
 
-    def _get_volume_info(self, volume_id: str) -> Dict:
+    def _get_volume_info(self, volume_id: str) -> dict:
         """Retrieve volume information and check if it is empty.
 
         This method fetches the volume information using the provided volume ID.
@@ -517,7 +519,7 @@ class VMServiceLayerManager(BackgroundTasks):
             raise exceptions.ComesEmptyVolumeInfo(message)
         return volume
 
-    def _check_volume_status(self, volume: Dict) -> None:
+    def _check_volume_status(self, volume: dict) -> None:
         """Check the status of the volume.
 
         This method checks the status of the provided volume. If the status is
@@ -536,8 +538,8 @@ class VMServiceLayerManager(BackgroundTasks):
             raise exceptions.VolumeStatusIsError(message)
 
     def _create_volumes(
-        self, vm_name: str, volumes: List, user_info: Dict
-    ) -> List:
+        self, vm_name: str, volumes: list, user_info: dict
+    ) -> list:
         """Create volumes for a virtual machine.
 
         Args:
@@ -578,8 +580,7 @@ class VMServiceLayerManager(BackgroundTasks):
                 exceptions.VolumeStatusIsError,
             ) as err:
                 message = (
-                    'While expecting volume availability '
-                    f'catch error: {err!s}'
+                    f'While expecting volume availability catch error: {err!s}'
                 )
                 LOG.error(message)
                 continue
@@ -597,7 +598,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Volumes was successfully created.')
         return auto_created_volumes
 
-    def _attach_image_to_vm(self, image_id: str, vm_id: str) -> Dict:
+    def _attach_image_to_vm(self, image_id: str, vm_id: str) -> dict:
         """Attach an image to a virtual machine.
 
         Args:
@@ -614,7 +615,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Image was successfully attached to vm.')
         return attach_info
 
-    def _attach_volume_to_vm(self, volume_id: str, vm_id: str) -> Dict:
+    def _attach_volume_to_vm(self, volume_id: str, vm_id: str) -> dict:
         """Attach a volume to a virtual machine.
 
         Args:
@@ -631,7 +632,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Volume was successfully attached to vm.')
         return attach_info
 
-    def _attach_disk_to_vm(self, vm_id: str, disk: Dict) -> Dict:
+    def _attach_disk_to_vm(self, vm_id: str, disk: dict) -> dict:
         """Attach a disk to a virtual machine.
 
         Args:
@@ -668,7 +669,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Disk was successfully attached to vm.')
         return disk
 
-    def _add_disks_to_vm(self, vm_id: str, disks: List) -> None:
+    def _add_disks_to_vm(self, vm_id: str, disks: list) -> None:
         """Attach a list of disks to a virtual machine.
 
         Args:
@@ -692,7 +693,7 @@ class VMServiceLayerManager(BackgroundTasks):
                     attached_disk = self._attach_disk_to_vm(vm_id, disk)
                     db_vm.disks.append(
                         cast(
-                            orm.Disk,
+                            'orm.Disk',
                             DataSerializer.to_db(attached_disk, orm.Disk),
                         )
                     )
@@ -704,7 +705,7 @@ class VMServiceLayerManager(BackgroundTasks):
             uow.commit()
         LOG.info('Disks was successfully attached and inserted into db.')
 
-    def _create_vm(self, data: Dict) -> None:
+    def _create_vm(self, data: dict) -> None:
         """Create a virtual machine and attach disks to it.
 
         Args:
@@ -743,7 +744,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Response on _create_vm was successfully processed.')
 
     @staticmethod
-    def _check_vm_status(vm_status: str, available_statuses: List) -> None:
+    def _check_vm_status(vm_status: str, available_statuses: list) -> None:
         """Check if the VM status is in the list of available statuses.
 
         Args:
@@ -757,8 +758,8 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Checking vm status on availability.')
         if vm_status not in available_statuses:
             message = (
-                f"Vm status is {vm_status}, but must be "
-                f"in {', '.join(available_statuses)}."
+                f'Vm status is {vm_status}, but must be '
+                f'in {", ".join(available_statuses)}.'
             )
             LOG.error(message)
             raise exceptions.VMStatusException(message)
@@ -766,7 +767,7 @@ class VMServiceLayerManager(BackgroundTasks):
 
     @staticmethod
     def _check_vm_power_state(
-        vm_power_state: str, available_states: List
+        vm_power_state: str, available_states: list
     ) -> None:
         """Check if the VM power state is in the list of available states.
 
@@ -781,8 +782,8 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Checking vm power state on availability.')
         if vm_power_state not in available_states:
             message = (
-                f"Vm power state is {vm_power_state}, but must "
-                f"be in {', '.join(available_states)}"
+                f'Vm power state is {vm_power_state}, but must '
+                f'be in {", ".join(available_states)}'
             )
             LOG.error(message)
             raise exceptions.VMPowerStateException(message)
@@ -814,7 +815,7 @@ class VMServiceLayerManager(BackgroundTasks):
         )
         LOG.info('Volume was successfully detached from vm.')
 
-    def _detach_disk_from_vm(self, vm_id: str, disk: Dict) -> None:
+    def _detach_disk_from_vm(self, vm_id: str, disk: dict) -> None:
         """Detach a disk from a virtual machine.
 
         Args:
@@ -837,7 +838,7 @@ class VMServiceLayerManager(BackgroundTasks):
             raise exceptions.UnexpectedDataArguments(message)
         LOG.info('Disk was successfully detached from vm.')
 
-    def _detach_disks_from_vm(self, disks: List) -> None:
+    def _detach_disks_from_vm(self, disks: list) -> None:
         """Detach and delete disks from a virtual machine.
 
         Args:
@@ -861,7 +862,7 @@ class VMServiceLayerManager(BackgroundTasks):
             uow.commit()
         LOG.info('Disks were successfully detached and deleted from db.')
 
-    def delete_vm(self, data: Dict) -> Optional[Dict]:
+    def delete_vm(self, data: dict) -> dict | None:
         """Delete a virtual machine by ID.
 
         Args:
@@ -920,7 +921,7 @@ class VMServiceLayerManager(BackgroundTasks):
             finally:
                 uow.commit()
 
-    def _delete_vm(self, data: Dict) -> None:
+    def _delete_vm(self, data: dict) -> None:
         """Delete a virtual machine from the database.
 
         Args:
@@ -960,7 +961,7 @@ class VMServiceLayerManager(BackgroundTasks):
             finally:
                 uow.commit()
 
-    def start_vm(self, data: Dict) -> Dict:
+    def start_vm(self, data: dict) -> dict:
         """Start a virtual machine by ID.
 
         This function changes the VM's status to starting and then
@@ -1003,7 +1004,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Response on start_vm was successfully processed.')
         return serialized_vm
 
-    def _start_vm(self, data: Dict) -> None:
+    def _start_vm(self, data: dict) -> None:
         """Start a virtual machine and update the database with the new state.
 
         This function starts the VM using the domain layer and updates
@@ -1049,8 +1050,8 @@ class VMServiceLayerManager(BackgroundTasks):
                     start_info.get('power_state')
                 ).name
                 db_vm.graphic_interface.url = (
-                    f"{start_info.get('url', '') or ''}"
-                    f":{start_info.get('port')}"
+                    f'{start_info.get("url", "") or ""}'
+                    f':{start_info.get("port")}'
                 )
                 db_vm.status = VmStatus.available.name
                 db_vm.information = ''
@@ -1064,7 +1065,7 @@ class VMServiceLayerManager(BackgroundTasks):
             LOG.info('Response on _start_vm was successfully processed.')
 
     def _set_recreated_snapshots_statuses(
-        self, vm_id: str, redefined_snaps: List
+        self, vm_id: str, redefined_snaps: list
     ) -> None:
         """Update snapshot statuses to 'creating' after successful VM start.
 
@@ -1080,7 +1081,7 @@ class VMServiceLayerManager(BackgroundTasks):
                     db_snap.status = SnapshotStatus.creating.name
                 uow.commit()
 
-    def shut_off_vm(self, data: Dict) -> Dict:
+    def shut_off_vm(self, data: dict) -> dict:
         """Shut off a virtual machine by ID.
 
         This function changes the VM's status to shutting off and then
@@ -1121,7 +1122,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Response on shut_off_vm was successfully processed.')
         return serialized_vm
 
-    def _shut_off_vm(self, data: Dict) -> None:
+    def _shut_off_vm(self, data: dict) -> None:
         """Shut off a virtual machine and update the database.
 
         This function calls the domain layer to shut off the VM and then
@@ -1162,7 +1163,7 @@ class VMServiceLayerManager(BackgroundTasks):
             )
             LOG.info('Response on _shut_off_vm was successfully processed.')
 
-    def _prepare_vm_info_for_edit(self, vm_data: Dict) -> EditVmInfo:
+    def _prepare_vm_info_for_edit(self, vm_data: dict) -> EditVmInfo:
         """Prepare the information needed to edit a virtual machine.
 
         Args:
@@ -1204,7 +1205,7 @@ class VMServiceLayerManager(BackgroundTasks):
         )
 
         disks = vm_data.pop('disks', {})
-        disk_ids: Set[str] = set()
+        disk_ids: set[str] = set()
 
         for attach_disk in disks.pop('attach_disks', []):
             disk_id = None
@@ -1265,7 +1266,7 @@ class VMServiceLayerManager(BackgroundTasks):
             uow.commit()
         LOG.info('VM was successfully updated in database.')
 
-    def _edit_vm_disks(self, disks: List) -> None:
+    def _edit_vm_disks(self, disks: list) -> None:
         """Update disks in the database.
 
         This function takes a list of dictionaries, each representing a disk,
@@ -1280,7 +1281,7 @@ class VMServiceLayerManager(BackgroundTasks):
             uow.commit()
         LOG.info('Disks were successfully updated in database.')
 
-    def _edit_virtual_interfaces(self, virtual_interfaces: List) -> None:
+    def _edit_virtual_interfaces(self, virtual_interfaces: list) -> None:
         """Update virtual interfaces in the database.
 
         Args:
@@ -1295,7 +1296,7 @@ class VMServiceLayerManager(BackgroundTasks):
             uow.commit()
         LOG.info('Virtual interfaces were successfully updated in database.')
 
-    def _detach_virtual_interfaces_from_vm(self, virt_interfaces: List) -> None:
+    def _detach_virtual_interfaces_from_vm(self, virt_interfaces: list) -> None:
         """Detach virtual interfaces from a virtual machine.
 
         Args:
@@ -1308,7 +1309,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Virtual interfaces were successfully detached from database.')
 
     def _add_virtual_interfaces_to_vm(
-        self, vm_id: str, virt_interfaces: List
+        self, vm_id: str, virt_interfaces: list
     ) -> None:
         """Add virtual interfaces to a virtual machine.
 
@@ -1322,7 +1323,7 @@ class VMServiceLayerManager(BackgroundTasks):
             for virt_interface in virt_interfaces:
                 db_vm.virtual_interfaces.append(
                     cast(
-                        orm.VirtualInterface,
+                        'orm.VirtualInterface',
                         DataSerializer.to_db(
                             virt_interface, orm.VirtualInterface
                         ),
@@ -1333,7 +1334,7 @@ class VMServiceLayerManager(BackgroundTasks):
             'Virtual interfaces were successfully added into database for VM.'
         )
 
-    def edit_vm(self, edit_info: Dict) -> Dict:
+    def edit_vm(self, edit_info: dict) -> dict:
         """Edit a virtual machine by ID.
 
         This function checks if the VM is in the right state to be edited,
@@ -1384,7 +1385,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Response on edit VM was successfully processed.')
         return serialized_vm
 
-    def _edit_shut_offed_vm(self, data: Dict) -> None:
+    def _edit_shut_offed_vm(self, data: dict) -> None:
         """Edit a shut-off virtual machine.
 
         This function handles the editing process for VMs that are in
@@ -1440,7 +1441,7 @@ class VMServiceLayerManager(BackgroundTasks):
             )
 
     def _process_vm_volumes(
-        self, vm_edit_info: EditVmInfo, vm_id: UUID, user_info: Dict
+        self, vm_edit_info: EditVmInfo, vm_id: UUID, user_info: dict
     ) -> None:
         """Process attaching volumes and creating new disks for the VM."""
         with self.uow() as uow:
@@ -1458,7 +1459,7 @@ class VMServiceLayerManager(BackgroundTasks):
                     vm_edit_info.attach_volumes + vm_edit_info.attach_images,
                 )
 
-    def vnc(self, data: Dict) -> Dict:
+    def vnc(self, data: dict) -> dict:
         """Access the VNC session of a virtual machine.
 
         Args:
@@ -1477,7 +1478,7 @@ class VMServiceLayerManager(BackgroundTasks):
             db_vm = uow.virtual_machines.get_or_fail(UUID(vm_id))
             serialized_vm = DataSerializer.vm_to_web(db_vm)
         try:
-            result: Dict = self.domain_rpc.call(
+            result: dict = self.domain_rpc.call(
                 BaseVMDriver.vnc.__name__, data_for_manager=serialized_vm
             )
         except (RpcCallException, RpcServerInitializedException) as err:
@@ -1487,7 +1488,7 @@ class VMServiceLayerManager(BackgroundTasks):
         else:
             return result
 
-    def clone_vm(self, data: Dict) -> List[Dict]:
+    def clone_vm(self, data: dict) -> list[dict]:
         """Clone a virtual machine.
 
         This function creates one or more clones of a virtual machine
@@ -1502,7 +1503,7 @@ class VMServiceLayerManager(BackgroundTasks):
         Returns:
             List[Dict]: _description_
         """
-        result: List[Dict] = []
+        result: list[dict] = []
 
         vm_id = data.pop('vm_id', '')
         count = data.pop('count', 1)
@@ -1571,7 +1572,9 @@ class VMServiceLayerManager(BackgroundTasks):
             clone_payload['name'] = create_new_clone_name(
                 original_vm['name'],
                 max_vm_number + i + 1,
-                cast(String, orm.VirtualMachines.__table__.c.name.type).length,
+                cast(
+                    'String', orm.VirtualMachines.__table__.c.name.type
+                ).length,
             )
 
             # 2. Prepare & insert stub record into DB
@@ -1596,13 +1599,12 @@ class VMServiceLayerManager(BackgroundTasks):
 
     def _transform_clone_vm_data(  # noqa: C901, PLR0913 # TODO: refactor using DTO and reduce parameters
         self,
-        vm: Dict,
-        user_info: Dict,
+        vm: dict,
+        user_info: dict,
         target_storage_id: UUID,
-        max_disk_numbers: Dict,
-        clone_macs: List[str],
+        max_numbers: dict,
         current_copy: int,
-    ) -> Dict:
+    ) -> dict:
         """Convert VM data for cloning.
 
         This function prepares the VM data for cloning by removing
@@ -1634,9 +1636,8 @@ class VMServiceLayerManager(BackgroundTasks):
                         data[section], ['id', 'vm_id']
                     )
 
-            virtual_interfaces: List[Dict] = []
-            for idx, vif in enumerate(vm.get('virtual_interfaces', [])):
-                mac_address = clone_macs[idx]
+            virtual_interfaces: list[dict] = []
+            for vif in vm.get('virtual_interfaces', []):
                 virtual_interfaces.append(
                     {
                         'mode': vif['mode'],
@@ -1649,7 +1650,7 @@ class VMServiceLayerManager(BackgroundTasks):
                 )
             data['virtual_interfaces'] = virtual_interfaces
 
-            attach_disks: List[Dict] = self._vm_clone_disks_payload(
+            attach_disks: list[dict] = self._vm_clone_disks_payload(
                 data.get('disks', []),
                 user_info,
                 max_disk_numbers,
@@ -1667,12 +1668,12 @@ class VMServiceLayerManager(BackgroundTasks):
 
     def _vm_clone_disks_payload(
         self,
-        disks_list: List,
-        user_info: Dict,
-        max_numbers: Dict,
+        disks_list: list,
+        user_info: dict,
+        max_numbers: dict,
         target_storage_id: UUID,
         current_copy: int,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Transform VM disks for cloning.
 
         This function prepares the disks of a virtual machine for cloning
@@ -1691,7 +1692,7 @@ class VMServiceLayerManager(BackgroundTasks):
             List[Dict]: A list of dictionaries representing the disks
                 ready for cloning, with unique names.
         """
-        attach_disks: List[Dict] = []
+        attach_disks: list[dict] = []
         for disk in disks_list:
             new_name = create_new_clone_name(
                 disk['name'], max_numbers[disk['name']] + current_copy + 1
@@ -1742,7 +1743,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('All disks were successfully prepared for cloning.')
         return attach_disks
 
-    def _strip_keys(self, src: Dict, keys: List[str]) -> Dict:
+    def _strip_keys(self, src: dict, keys: list[str]) -> dict:
         """Remove specified keys from a dictionary
 
         Args:
@@ -1754,7 +1755,7 @@ class VMServiceLayerManager(BackgroundTasks):
         """
         return {k: v for k, v in src.items() if k not in keys}
 
-    def get_snapshot(self, data: Dict) -> Dict:
+    def get_snapshot(self, data: dict) -> dict:
         """Retrieve a specific snapshot by VM ID and snapshot ID.
 
         Args:
@@ -1796,7 +1797,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Successfully processed get snapshot request.')
         return result
 
-    def get_snapshots(self, data: Dict) -> List[Dict]:
+    def get_snapshots(self, data: dict) -> list[dict]:
         """Retrieve all snapshots for a virtual machine by VM ID.
 
         Args:
@@ -1833,7 +1834,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Successfully processed get snapshots of VM request.')
         return serialized_snapshots
 
-    def create_snapshot(self, data: Dict) -> Dict:
+    def create_snapshot(self, data: dict) -> dict:
         """Create a new snapshot.
 
         Args:
@@ -1854,15 +1855,14 @@ class VMServiceLayerManager(BackgroundTasks):
             if snap_count >= max_snapshot_count:
                 message = (
                     f'VM {vm_id} has already reached maximum snapshot '
-                    f'limit ({snap_count+1} > {max_snapshot_count}).'
+                    f'limit ({snap_count + 1} > {max_snapshot_count}).'
                 )
                 LOG.error(message)
                 raise exceptions.SnapshotLimitExceeded(message)
             exist_snapshot = uow.snapshots.get_by_name(vm_id, name)
             if exist_snapshot is not None:
                 message = (
-                    f"Snapshot with name '{name}' already exists "
-                    f'for VM {vm_id}'
+                    f"Snapshot with name '{name}' already exists for VM {vm_id}"
                 )
                 LOG.error(message)
                 raise exceptions.SnapshotNameExistsError(message)
@@ -1895,7 +1895,7 @@ class VMServiceLayerManager(BackgroundTasks):
             vm_id,
             user_info.get('id'),
             self.create_snapshot.__name__,
-            f"Started creation of snapshot {result['name']}",
+            f'Started creation of snapshot {result["name"]}',
         )
         self.service_layer_rpc.cast(
             self._create_snapshot.__name__,
@@ -1909,7 +1909,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Snapshot creation process started')
         return result
 
-    def _create_snapshot(self, data: Dict) -> None:
+    def _create_snapshot(self, data: dict) -> None:
         LOG.info('Handling response on _create_snapshot.')
         vm_id = str(data.pop('vm_id'))
         snapshot_id = str(data.pop('snapshot_id'))
@@ -1937,11 +1937,11 @@ class VMServiceLayerManager(BackgroundTasks):
             self._create_snapshot.__name__,
             f'Snapshot {db_snap.name} created',
         )
-        LOG.info('Response on _create_snapshot was successfully ' 'processed.')
+        LOG.info('Response on _create_snapshot was successfully processed.')
 
     @staticmethod
     def _check_snapshot_status(
-        snap_status: str, available_statuses: List
+        snap_status: str, available_statuses: list
     ) -> None:
         """Check if the snapshot status is in the list of available statuses.
 
@@ -1956,14 +1956,14 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Checking snapshot status on availability.')
         if snap_status not in available_statuses:
             message = (
-                f"Snapshot status is {snap_status}, but must "
-                f"be in {', '.join(available_statuses)}"
+                f'Snapshot status is {snap_status}, but must '
+                f'be in {", ".join(available_statuses)}'
             )
             LOG.error(message)
             raise exceptions.SnapshotStatusException(message)
         LOG.info('Snapshot status was successfully checked.')
 
-    def revert_snapshot(self, data: Dict) -> Dict:
+    def revert_snapshot(self, data: dict) -> dict:
         """Revert virtual machine to a specific snapshot.
 
         Args:
@@ -2018,7 +2018,7 @@ class VMServiceLayerManager(BackgroundTasks):
             vm_id,
             user_info.get('id'),
             self.revert_snapshot.__name__,
-            f"Starting revert to snapshot {result['name']}",
+            f'Starting revert to snapshot {result["name"]}',
         )
         self.service_layer_rpc.cast(
             self._revert_snapshot.__name__,
@@ -2031,7 +2031,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Snapshot reverting process started')
         return result
 
-    def _revert_snapshot(self, data: Dict) -> None:
+    def _revert_snapshot(self, data: dict) -> None:
         """Revert virtual machine to the snapshot and update the database
 
         Args:
@@ -2067,7 +2067,7 @@ class VMServiceLayerManager(BackgroundTasks):
         )
         LOG.info('Response on _revert_snapshot was successfully processed.')
 
-    def delete_snapshot(self, data: Dict) -> Dict:
+    def delete_snapshot(self, data: dict) -> dict:
         """Delete a snapshot of the virtual machine.
 
         Args:
@@ -2126,8 +2126,7 @@ class VMServiceLayerManager(BackgroundTasks):
                     f'{db_snap.name} from the database.',
                 )
                 LOG.info(
-                    'Snapshot with status "error" was deleted from '
-                    'the database'
+                    'Snapshot with status "error" was deleted from the database'
                 )
                 return result
             db_snap.status = SnapshotStatus.deleting.name
@@ -2144,7 +2143,7 @@ class VMServiceLayerManager(BackgroundTasks):
         LOG.info('Snapshot deletion process started')
         return result
 
-    def _delete_snapshot(self, data: Dict) -> None:
+    def _delete_snapshot(self, data: dict) -> None:
         """Delete a snapshot of the virtual machine.
 
         Args:
@@ -2208,7 +2207,7 @@ class VMServiceLayerManager(BackgroundTasks):
             uow.snapshots.delete(db_snap)
             uow.commit()
 
-    def _delete_all_vm_snapshots(self, vm_id: str, user_info: Dict) -> None:
+    def _delete_all_vm_snapshots(self, vm_id: str, user_info: dict) -> None:
         """Delete all snapshots of the virtual machine (while deleting VM).
 
         Args:
@@ -2271,7 +2270,7 @@ class VMServiceLayerManager(BackgroundTasks):
         self._update_current_snapshot(vm_id, libvirt_current_snap)
 
     def _update_current_snapshot(
-        self, vm_id: str, libvirt_current_snap: Optional[str]
+        self, vm_id: str, libvirt_current_snap: str | None
     ) -> None:
         """Update is_current flag for VM snapshots.
 

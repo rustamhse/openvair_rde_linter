@@ -33,7 +33,6 @@ Functions:
 
 import uuid
 import datetime
-from typing import List
 
 from sqlalchemy import (
     JSON,
@@ -113,7 +112,7 @@ class VirtualMachines(Base):
         lazy='selectin',
     )
 
-    disks: Mapped[List['Disk']] = relationship(
+    disks: Mapped[list['Disk']] = relationship(
         'Disk',
         back_populates='virtual_machine',
         order_by='Disk.order',
@@ -122,7 +121,7 @@ class VirtualMachines(Base):
         lazy='selectin',
     )
 
-    virtual_interfaces: Mapped[List['VirtualInterface']] = relationship(
+    virtual_interfaces: Mapped[list['VirtualInterface']] = relationship(
         'VirtualInterface',
         back_populates='virtual_machine',
         order_by='VirtualInterface.order',
@@ -147,7 +146,7 @@ class VirtualMachines(Base):
         lazy='selectin',
     )
 
-    snapshots: Mapped[List['Snapshots']] = relationship(
+    snapshots: Mapped[list['Snapshots']] = relationship(
         'Snapshots',
         back_populates='virtual_machine',
         order_by='Snapshots.created_at',
