@@ -32,6 +32,7 @@ OPENVAIR_MODULES_DIR = REPO_ROOT / 'openvair' / 'modules'
 # LLM defaults (override via experiment/.env)
 DEFAULT_OPENAI_MODEL = 'gpt-5.5'
 DEFAULT_REASONING_EFFORT = 'low'
-# OpenAI Standard pricing for gpt-5.5 (USD per 1M tokens, May 2026).
+# OpenAI Standard pricing for gpt-5.5 (USD per 1M tokens).
 DEFAULT_LLM_INPUT_COST_PER_1M = 5.0
+DEFAULT_LLM_CACHED_INPUT_COST_PER_1M = 0.5
 DEFAULT_LLM_OUTPUT_COST_PER_1M = 30.0

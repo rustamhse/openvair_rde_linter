@@ -20,3 +20,10 @@ repos:
         language: system
         types: [python]
         exclude: ^(experiment/|requirements_linter/)
+      - id: rde-spec-linter
+        name: RDE Markdown specs
+        entry: python requirements_linter/lint_repo_specs.py
+        language: python
+        pass_filenames: false
+        files: ^specs/
+        additional_dependencies: [pyyaml]

@@ -16,6 +16,7 @@ if str(_BOOT) not in sys.path:
     sys.path.insert(0, str(_BOOT))
 
 from experiment.config import (  # noqa: E402
+    DEFAULT_LLM_CACHED_INPUT_COST_PER_1M,
     DEFAULT_LLM_INPUT_COST_PER_1M,
     DEFAULT_LLM_OUTPUT_COST_PER_1M,
     DEFAULT_OPENAI_MODEL,
@@ -125,11 +126,22 @@ def _use_responses_api(model: str) -> bool:
     return model.startswith('gpt-5') or model.startswith('o')
 
 
-def _estimate_cost(tokens_in: int, tokens_out: int) -> float:
+def _estimate_cost(
+    tokens_in: int,
+    tokens_out: int,
+    *,
+    tokens_cached_in: int = 0,
+) -> float:
     cost_in = float(
         os.environ.get(
             'LLM_INPUT_COST_PER_1M',
             str(DEFAULT_LLM_INPUT_COST_PER_1M),
+        ),
+    )
+    cost_cached = float(
+        os.environ.get(
+            'LLM_CACHED_INPUT_COST_PER_1M',
+            str(DEFAULT_LLM_CACHED_INPUT_COST_PER_1M),
         ),
     )
     cost_out = float(
@@ -138,7 +150,20 @@ def _estimate_cost(tokens_in: int, tokens_out: int) -> float:
             str(DEFAULT_LLM_OUTPUT_COST_PER_1M),
         ),
     )
-    return (tokens_in / 1_000_000 * cost_in) + (tokens_out / 1_000_000 * cost_out)
+    cached = min(max(tokens_cached_in, 0), tokens_in)
+    billable_in = tokens_in - cached
+    return (
+        billable_in / 1_000_000 * cost_in
+        + cached / 1_000_000 * cost_cached
+        + tokens_out / 1_000_000 * cost_out
+    )
+
+
+def _cached_input_tokens(usage: Any) -> int:
+    details = getattr(usage, 'input_tokens_details', None)
+    if details is not None:
+        return int(getattr(details, 'cached_tokens', 0) or 0)
+    return int(getattr(usage, 'cached_tokens', 0) or 0)
 
 
 def _call_openai(
@@ -147,8 +172,8 @@ def _call_openai(
     model: str,
     system: str,
     user: str,
-) -> tuple[str, int, int, str]:
-    """Return (raw_json, tokens_in, tokens_out, api_mode)."""
+) -> tuple[str, int, int, int, str]:
+    """Return (raw_json, tokens_in, tokens_out, tokens_cached_in, api_mode)."""
     if _use_responses_api(model):
         effort = os.environ.get(
             'OPENAI_REASONING_EFFORT',
@@ -177,7 +202,8 @@ def _call_openai(
         usage = response.usage
         tokens_in = int(getattr(usage, 'input_tokens', 0) or 0)
         tokens_out = int(getattr(usage, 'output_tokens', 0) or 0)
-        return raw, tokens_in, tokens_out, 'responses'
+        tokens_cached = _cached_input_tokens(usage) if usage else 0
+        return raw, tokens_in, tokens_out, tokens_cached, 'responses'
 
     response = client.chat.completions.create(
         model=model,
@@ -197,8 +223,9 @@ def _call_openai(
     usage = response.usage
     tokens_in = int(usage.prompt_tokens if usage else 0)
     tokens_out = int(usage.completion_tokens if usage else 0)
+    tokens_cached = _cached_input_tokens(usage) if usage else 0
     raw = response.choices[0].message.content or '{}'
-    return raw, tokens_in, tokens_out, 'chat_completions'
+    return raw, tokens_in, tokens_out, tokens_cached, 'chat_completions'
 
 
 def main() -> int:
@@ -249,14 +276,18 @@ def main() -> int:
         print(f'LLM {module}...', flush=True)
         t_mod = time.perf_counter()
         try:
-            raw, tokens_in, tokens_out, mode = _call_openai(
+            raw, tokens_in, tokens_out, tokens_cached, mode = _call_openai(
                 client,
                 model=model,
                 system=SYSTEM_PROMPT,
                 user=user_prompt,
             )
             elapsed = time.perf_counter() - t_mod
-            cost_usd = _estimate_cost(tokens_in, tokens_out)
+            cost_usd = _estimate_cost(
+                tokens_in,
+                tokens_out,
+                tokens_cached_in=tokens_cached,
+            )
             total_cost_usd += cost_usd
 
             parsed = json.loads(raw)
@@ -269,6 +300,7 @@ def main() -> int:
                 'api_mode': mode,
                 'seconds': round(elapsed, 4),
                 'tokens_in': tokens_in,
+                'tokens_cached_in': tokens_cached,
                 'tokens_out': tokens_out,
                 'cost_usd': round(cost_usd, 6),
                 'issue_count': len(issues),

@@ -58,11 +58,12 @@ OPENAI_REASONING_EFFORT=low
 Для **gpt-5.5** скрипт использует **Responses API** + Structured Outputs (рекомендация OpenAI).  
 Сравнение с прошлым поколением: `OPENAI_MODEL=gpt-4o-2024-08-06` и `OPENAI_USE_RESPONSES=0`.
 
-Тарифы для оценки `$` в отчёте (возьмите с [pricing](https://platform.openai.com/docs/pricing)):
+Тарифы для оценки `$` в отчёте (gpt-5.5 Standard, [pricing](https://openai.com/api/pricing/)):
 
 ```env
-LLM_INPUT_COST_PER_1M=2.0
-LLM_OUTPUT_COST_PER_1M=8.0
+LLM_INPUT_COST_PER_1M=5.0
+LLM_CACHED_INPUT_COST_PER_1M=0.5
+LLM_OUTPUT_COST_PER_1M=30.0
 ```
 
 ---
