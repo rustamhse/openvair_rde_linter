@@ -46,6 +46,12 @@ dependencies = [
 ]
 
 [dependency-groups]
+experiment = [
+    "openai>=1.40.0",
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0",
+    "matplotlib>=3.8.0",
+]
 dev = [
     "isort>=6.0.1",
     "mypy~=1.18",
