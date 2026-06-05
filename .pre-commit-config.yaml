@@ -11,3 +11,9 @@ repos:
       entry: bash .githooks/ruff
       language: system
       types: [python]
+    - id: rde-spec-linter
+      name: RDE Markdown specs
+      entry: bash .githooks/rde-linter
+      language: system
+      files: ^specs/
+      pass_filenames: false
